@@ -36,8 +36,9 @@ chords to come through and plenty of wrong or missing notes, especially in busy,
 produced songs. Clean, well-separated guitar parts work best. The red notes and the original-audio mode
 are there to help you spot and judge the mistakes; the editor (M5) is how they'll get fixed.
 
-**Processing time:** on a typical laptop without a graphics card, separating a 4-minute song takes roughly
-3–6 minutes; note detection adds under a minute. With an NVIDIA GPU, separation is much faster.
+**Processing time:** without a graphics card, separating a full song takes several minutes (it depends a
+lot on the machine and hasn't been benchmarked yet); note detection adds under a minute for a typical song.
+With an NVIDIA GPU, separation is much faster.
 
 ## Running it
 
