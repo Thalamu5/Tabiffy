@@ -142,6 +142,41 @@ def suggest_capo(score: TabiffyScore, source: Track, opts: ResolveOptions, max_c
     return best
 
 
+def solve_all(
+    source: TabiffyScore,
+    settings: SolverSettings | None = None,
+    previous: TabiffyScore | None = None,
+    on_progress=None,
+) -> TabiffyScore:
+    """Build every output track from `source`. With `previous`, each track keeps the
+    target/tuning/capo/transpose the user chose (matched by source track index)."""
+    out = source.model_copy(deep=True)
+    out.settings = settings or (previous.settings if previous else SolverSettings())
+    out.tracks = []
+    prev_by_src = {t.source_track_index: t for t in previous.tracks} if previous else {}
+    for i, src in enumerate(source.tracks):
+        if on_progress:
+            on_progress(i / max(1, len(source.tracks)))
+        prev = prev_by_src.get(src.source_track_index)
+        if prev:
+            opts = ResolveOptions(
+                target=prev.target_instrument,
+                tuning=prev.tuning or None,
+                capo=prev.capo,
+                transpose=prev.transpose_semitones,
+                settings=out.settings,
+            )
+            track_id, name = prev.id, prev.name
+        else:
+            opts = ResolveOptions(target=src.target_instrument, settings=out.settings)
+            track_id, name = f"t{i + 1}", src.name
+        track, _ = build_track(source, src, opts, track_id)
+        track.name = name
+        out.tracks.append(track)
+    relabel_chords(out)
+    return out
+
+
 def import_midi(
     data: bytes, filename: str, settings: SolverSettings | None = None, on_stage=None
 ) -> tuple[TabiffyScore, TabiffyScore]:
@@ -156,17 +191,17 @@ def import_midi(
     stage("analyze", 0.3)
     if not source.meta.key:
         source.meta.key = detect_key([n for t in source.tracks for n in t.notes])
-    out = source.model_copy(deep=True)
-    out.settings = settings or SolverSettings()
-    out.tracks = []
-    for i, src in enumerate(source.tracks):
-        stage("solve", 0.4 + 0.5 * i / len(source.tracks))
-        target = src.target_instrument
-        track, _ = build_track(source, src, ResolveOptions(target=target, settings=out.settings), f"t{i + 1}")
-        out.tracks.append(track)
-    stage("chords", 0.95)
-    relabel_chords(out)
+    stage("solve", 0.5)
+    out = solve_all(source, settings, on_progress=lambda f: stage("solve", 0.5 + 0.45 * f))
     return source, out
 
 
-__all__ = ["import_midi", "build_track", "relabel_chords", "suggest_capo", "ResolveOptions", "transpose_chord_symbol"]
+__all__ = [
+    "import_midi",
+    "solve_all",
+    "build_track",
+    "relabel_chords",
+    "suggest_capo",
+    "ResolveOptions",
+    "transpose_chord_symbol",
+]

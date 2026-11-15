@@ -1,12 +1,16 @@
 import * as alphaTab from '@coderline/alphatab'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { toAlphaTex } from '../lib/toAlphaTex'
+import { getAudio } from '../lib/api'
+import { attachRecording, buildAlphaTabScore } from '../lib/alphaTabScore'
 import type { TabiffyScore } from '../lib/types'
 
 interface Props {
   score: TabiffyScore
+  scoreId: string
   trackIndex: number
   onTick: (tick: number) => void
+  /** Move the cursor here (the `n` counter lets the same tick be requested twice). */
+  seek?: { tick: number; n: number } | null
 }
 
 function download(bytes: Uint8Array, filename: string, type: string) {
@@ -23,7 +27,7 @@ function safeName(s: string) {
 }
 
 /** alphaTab score view + player controls + exports. */
-export function ScoreView({ score, trackIndex, onTick }: Props) {
+export function ScoreView({ score, scoreId, trackIndex, onTick, seek }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<alphaTab.AlphaTabApi | null>(null)
@@ -42,6 +46,9 @@ export function ScoreView({ score, trackIndex, onTick }: Props) {
   const [muted, setMuted] = useState<Set<number>>(new Set())
   const [solo, setSolo] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [source, setSource] = useState<'synth' | 'original'>('synth')
+  const [recording, setRecording] = useState<{ id: string; bytes: Uint8Array } | null>(null)
+  const hasAudio = !!score.audio
 
   // Create the alphaTab instance once.
   useEffect(() => {
@@ -50,7 +57,8 @@ export function ScoreView({ score, trackIndex, onTick }: Props) {
       core: { fontDirectory: '/font/' },
       display: { layoutMode: alphaTab.LayoutMode.Page, scale: 0.95 },
       player: {
-        playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
+        // Automatic: plays the original recording when one is attached, else the synthesizer.
+        playerMode: alphaTab.PlayerMode.EnabledAutomatic,
         soundFont: '/soundfont/sonivox.sf2',
         scrollElement: viewportRef.current ?? undefined,
         enableUserInteraction: true,
@@ -69,20 +77,47 @@ export function ScoreView({ score, trackIndex, onTick }: Props) {
     }
   }, [])
 
+  // Fetch the original recording the first time it's needed.
+  useEffect(() => {
+    if (source !== 'original' || !hasAudio || recording?.id === scoreId) return
+    let cancelled = false
+    getAudio(scoreId)
+      .then((bytes) => !cancelled && setRecording({ id: scoreId, bytes }))
+      .catch((e) => {
+        if (cancelled) return
+        setError((e as Error).message)
+        setSource('synth')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [source, hasAudio, scoreId, recording])
+
+  const audioBytes = source === 'original' && recording?.id === scoreId ? recording.bytes : null
+
   const converted = useMemo(() => {
     try {
-      return { tex: toAlphaTex(score), error: null }
+      const at = buildAlphaTabScore(score, new alphaTab.Settings())
+      if (audioBytes) attachRecording(at, score, audioBytes)
+      return { at, error: null }
     } catch (e) {
-      return { tex: null, error: `Could not convert this score: ${(e as Error).message}` }
+      return { at: null, error: `Could not convert this score: ${(e as Error).message}` }
     }
-  }, [score])
+  }, [score, audioBytes])
 
-  // (Re)load the score whenever it or the shown track changes.
+  // (Re)load the score whenever it, the shown track, or the sound source changes.
   useEffect(() => {
     const api = apiRef.current
-    if (!api) return
-    if (converted.tex) api.tex(converted.tex, [trackIndex])
+    if (api && converted.at) api.renderScore(converted.at, [trackIndex])
   }, [converted, trackIndex])
+
+  useEffect(() => {
+    const api = apiRef.current
+    if (api && seek) {
+      api.tickPosition = seek.tick
+      onTickRef.current(seek.tick)
+    }
+  }, [seek])
 
   const api = () => apiRef.current
   const tracks = () => api()?.score?.tracks ?? []
@@ -125,7 +160,15 @@ export function ScoreView({ score, trackIndex, onTick }: Props) {
           {playing ? '❚❚ Pause' : '▶ Play'}
         </button>
         <button disabled={!ready} onClick={() => api()?.stop()}>■ Stop</button>
-        {!ready && <span className="muted">Loading sounds… {loading}%</span>}
+        {!ready && <span className="muted">{source === 'original' ? 'Loading recording…' : `Loading sounds… ${loading}%`}</span>}
+        {hasAudio && (
+          <div className="segmented" role="group" aria-label="Sound">
+            <button className={source === 'synth' ? 'on' : ''} onClick={() => { api()?.stop(); setSource('synth') }}>Synth</button>
+            <button className={source === 'original' ? 'on' : ''} onClick={() => { api()?.stop(); setReady(false); setSource('original') }}>
+              Original recording
+            </button>
+          </div>
+        )}
         <label className="inline" title="Playback speed">
           Speed {speed}%
           <input type="range" min={25} max={150} step={5} value={speed}

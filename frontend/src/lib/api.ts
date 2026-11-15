@@ -1,4 +1,4 @@
-import type { CapoSuggestion, Job, SolverSettings, TabiffyScore, TargetInstrument, TuningPreset } from './types'
+import type { AudioMode, CapoSuggestion, Job, SolverSettings, TabiffyScore, TargetInstrument, TuningPreset } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -14,9 +14,10 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function uploadFile(file: File): Promise<string> {
+export async function uploadFile(file: File, mode: AudioMode = 'full'): Promise<string> {
   const form = new FormData()
   form.append('file', file)
+  form.append('mode', mode)
   const { jobId } = await json<{ jobId: string }>(await fetch('/api/jobs', { method: 'POST', body: form }))
   return jobId
 }
@@ -100,4 +101,32 @@ export async function suggestCapo(id: string, req: ResolveRequest): Promise<Capo
 
 export async function getTunings(): Promise<Record<string, TuningPreset>> {
   return json(await fetch('/api/tunings'))
+}
+
+export interface TimingRequest {
+  timeSignature: [number, number]
+  /** MIDI scores */
+  bpm?: number
+  /** audio scores: 0.5, 1 or 2 */
+  tempoFactor?: number
+  /** audio scores: move bar lines by N beats */
+  downbeatShift?: number
+}
+
+export async function setTiming(id: string, req: TimingRequest): Promise<TabiffyScore> {
+  return json(await fetch(`/api/scores/${id}/timing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  }))
+}
+
+export async function getAudio(id: string): Promise<Uint8Array> {
+  const res = await fetch(`/api/scores/${id}/audio`)
+  if (!res.ok) throw new Error('The original recording is not available')
+  return new Uint8Array(await res.arrayBuffer())
+}
+
+export function isAudioFile(name: string): boolean {
+  return /\.(mp3|wav|flac|ogg|m4a|aac|opus|aiff?)$/i.test(name)
 }

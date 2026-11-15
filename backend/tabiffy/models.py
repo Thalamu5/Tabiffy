@@ -18,7 +18,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-Instrument = Literal["guitar", "bass", "piano", "other"]
+Instrument = Literal["guitar", "bass", "piano", "vocals", "other"]
 TargetInstrument = Literal["guitar", "bass", "piano"]
 
 
@@ -97,6 +97,26 @@ class SolverSettings(_Model):
     quantize: Literal["off", "1/8", "1/16", "1/16+triplets", "1/32"] = "1/16"
 
 
+class SyncPoint(_Model):
+    """Where a tick of the score falls in the original recording."""
+
+    tick: int
+    seconds: float
+
+
+class AudioInfo(_Model):
+    """Present when the score was transcribed from an audio file."""
+
+    duration_seconds: float = 0.0
+    separated: bool = False  # stems were split with Demucs
+    mode: str = "full"  # "full" or a solo instrument: "guitar" | "bass" | "piano" | "other"
+    detected_bpm: float = 120.0
+    tempo_factor: float = 1.0  # user override: 0.5 = half time, 2 = double time
+    downbeat_shift: int = 0  # user override: move bar lines by N beats
+    sync_points: list[SyncPoint] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class TabiffyScore(_Model):
     version: int = 1
     meta: Meta = Field(default_factory=Meta)
@@ -105,6 +125,7 @@ class TabiffyScore(_Model):
     chords: list[ChordLabel] = Field(default_factory=list)
     tracks: list[Track] = Field(default_factory=list)
     settings: SolverSettings = Field(default_factory=SolverSettings)
+    audio: AudioInfo | None = None
 
     def to_json(self) -> str:
         return self.model_dump_json(by_alias=True, exclude_none=True, indent=2)

@@ -31,17 +31,46 @@ def _job_dir(job_id: str) -> Path:
     return data_dir() / "jobs" / job_id
 
 
-def new_job(filename: str, data: bytes) -> str:
+def new_job(filename: str, data: bytes | None = None, options: dict | None = None) -> str:
+    """Create a job folder. Pass `data`, or write the upload to `input_path(job_id, filename)` yourself."""
     job_id = uuid.uuid4().hex
-    d = _job_dir(job_id)
-    (d / "stages").mkdir(parents=True)
-    ext = Path(filename).suffix.lower() or ".bin"
-    (d / f"input{ext}").write_bytes(data)
-    write_job(
-        job_id,
-        {"id": job_id, "filename": filename, "status": "queued", "stage": "queued", "progress": 0.0, "error": None},
-    )
+    (_job_dir(job_id) / "stages").mkdir(parents=True)
+    if data is not None:
+        input_path(job_id, filename).write_bytes(data)
+    job = {
+        "id": job_id,
+        "filename": filename,
+        "status": "queued",
+        "stage": "queued",
+        "stageLabel": "Waiting in line",
+        "progress": 0.0,
+        "error": None,
+        "options": options or {},
+    }
+    write_job(job_id, job)
     return job_id
+
+
+def input_path(job_id: str, filename: str) -> Path:
+    ext = Path(filename).suffix.lower() or ".bin"
+    return _job_dir(job_id) / f"input{ext}"
+
+
+def stages_dir(job_id: str) -> Path:
+    return _job_dir(job_id) / "stages"
+
+
+def audio_preview(score_id: str) -> Path:
+    p = stages_dir(score_id) / "audio.mp3"
+    if not p.exists():
+        raise KeyError(score_id)
+    return p
+
+
+def delete_job_dir(job_id: str) -> None:
+    import shutil
+
+    shutil.rmtree(_job_dir(job_id), ignore_errors=True)
 
 
 def write_job(job_id: str, job: dict) -> None:

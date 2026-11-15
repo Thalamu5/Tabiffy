@@ -3,9 +3,11 @@ import { Fretboard } from './components/Fretboard'
 import { Piano } from './components/Piano'
 import { ScoreView } from './components/ScoreView'
 import { SettingsPanel, type TrackSettings } from './components/SettingsPanel'
+import { TimingPanel } from './components/TimingPanel'
 import { Upload } from './components/Upload'
-import { getScore, getTunings, resolveTrack, suggestCapo, uploadFile, watchJob, type ResolveRequest } from './lib/api'
-import type { CapoSuggestion, Job, TabiffyScore, TuningPreset } from './lib/types'
+import { getScore, getTunings, isAudioFile, resolveTrack, setTiming, suggestCapo, uploadFile, watchJob, type ResolveRequest, type TimingRequest } from './lib/api'
+import { isUncertain } from './lib/alphaTabScore'
+import type { AudioMode, CapoSuggestion, Job, TabiffyScore, TuningPreset } from './lib/types'
 
 const LOOKAHEAD_TICKS = 480
 
@@ -39,6 +41,7 @@ export default function App() {
   const [tunings, setTunings] = useState<Record<string, TuningPreset>>({})
   const [suggestion, setSuggestion] = useState<CapoSuggestion | null>(null)
   const [leftHanded, setLeftHanded] = useState(readPref('tabiffy.leftHanded'))
+  const [seek, setSeek] = useState<{ tick: number; n: number } | null>(null)
 
   useEffect(() => {
     getTunings().then(setTunings).catch(() => {})
@@ -68,11 +71,13 @@ export default function App() {
     setScoreId(id)
   }
 
-  const onFile = async (file: File) => {
+  const onFile = async (file: File, mode: AudioMode) => {
     setError(null)
     setBusy(true)
+    setJob({ id: '', filename: file.name, status: 'queued', stage: 'upload', stageLabel: 'Uploading', progress: 0, error: null,
+      options: { mode, kind: isAudioFile(file.name) ? 'audio' : 'midi' } })
     try {
-      const jobId = await uploadFile(file)
+      const jobId = await uploadFile(file, mode)
       watchJob(jobId, (j) => {
         setJob(j)
         if (j.status === 'done') {
@@ -81,11 +86,13 @@ export default function App() {
           openScore(j.scoreId ?? j.id)
         } else if (j.status === 'error') {
           setBusy(false)
+          setJob(null)
           setError(j.error ?? 'Processing failed')
         }
       })
     } catch (e) {
       setBusy(false)
+      setJob(null)
       setError((e as Error).message)
     }
   }
@@ -129,6 +136,19 @@ export default function App() {
     }
   }
 
+  const onTiming = async (req: TimingRequest) => {
+    if (!scoreId) return
+    setBusy(true)
+    setError(null)
+    try {
+      setScore(await setTiming(scoreId, req))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onTick = useCallback((t: number) => setTick(t), [])
 
   const { active, upcoming } = useMemo(() => {
@@ -139,7 +159,12 @@ export default function App() {
     return { active, upcoming }
   }, [track, tick])
 
-  const flagged = track?.notes.filter((n) => n.flags.includes('outOfRange') || n.flags.includes('hardFingering')).length ?? 0
+  const uncertain = useMemo(() => (track ? track.notes.filter(isUncertain) : []), [track])
+  const reviewNext = () => {
+    if (!uncertain.length) return
+    const next = uncertain.find((n) => n.tick > tick) ?? uncertain[0]
+    setSeek({ tick: next.tick, n: (seek?.n ?? 0) + 1 })
+  }
   const currentChord = shown?.chords.find((c) => c.tick <= tick && tick < c.tick + c.durationTicks)
 
   return (
@@ -165,8 +190,12 @@ export default function App() {
       {!scoreId && !job && <Upload onFile={onFile} busy={busy} />}
       {job && (
         <div className="job">
-          <p>Working on <strong>{job.filename}</strong>: {job.stage}…</p>
+          <p>Working on <strong>{job.filename}</strong></p>
+          <p className="muted">{job.stageLabel ?? job.stage}…</p>
           <div className="progress"><div style={{ width: `${Math.round(job.progress * 100)}%` }} /></div>
+          {job.options?.kind === 'audio' && job.options.mode === 'full' && (
+            <p className="hint">Separating the instruments takes a few minutes for a full song (faster with a graphics card). You can leave this page open.</p>
+          )}
         </div>
       )}
 
@@ -181,13 +210,17 @@ export default function App() {
                 </button>
               ))}
             </div>
-            {flagged > 0 && (
-              <div className="notice">
-                {flagged} note{flagged > 1 ? 's' : ''} in this track couldn’t be placed comfortably (out of range or a hard
-                stretch) and are shown in red on the fretboard. A tab editor to fix these by hand is the next milestone.
+            {shown.audio?.warnings.map((w) => <div key={w} className="notice">{w}</div>)}
+            {uncertain.length > 0 && (
+              <div className="notice review">
+                <span>
+                  <strong className="warn-text">{uncertain.length}</strong> note{uncertain.length > 1 ? 's' : ''} in this track
+                  {shown.audio ? ' may be wrong (the transcription was unsure) or' : ''} couldn’t be placed comfortably. They’re shown in red.
+                </span>
+                <button onClick={reviewNext}>Review next uncertain note ▶</button>
               </div>
             )}
-            <ScoreView score={shown} trackIndex={trackIndex} onTick={onTick} />
+            <ScoreView score={shown} scoreId={scoreId!} trackIndex={trackIndex} onTick={onTick} seek={seek} />
             <section className="visualizer">
               <div className="viz-head">
                 <span>
@@ -209,10 +242,11 @@ export default function App() {
               <p className="legend muted">
                 {track.targetInstrument === 'piano'
                   ? 'Blue = left hand, orange = right hand. Faded keys are coming up next.'
-                  : 'Numbers are fingers: 1 index · 2 middle · 3 ring · 4 pinky · 0 open string. Faded dots are coming up next.'}
+                  : 'Numbers are fingers: 1 index · 2 middle · 3 ring · 4 pinky · 0 open string. Red = worth checking. Faded dots are coming up next.'}
               </p>
             </section>
           </main>
+          <div className="sidebar">
           <SettingsPanel
             key={`${track.id}|${track.targetInstrument}|${track.tuning.join(',')}|${track.capo}|${track.transposeSemitones}|${JSON.stringify(shown.settings)}`}
             track={track}
@@ -223,6 +257,13 @@ export default function App() {
             onApply={onApply}
             onSuggestCapo={onSuggestCapo}
           />
+          <TimingPanel
+            key={`${shown.meta.timeSignature.join('/')}|${shown.tempoMap[0]?.bpm}|${shown.audio?.tempoFactor}|${shown.audio?.downbeatShift}`}
+            score={shown}
+            busy={busy}
+            onApply={onTiming}
+          />
+          </div>
         </div>
       )}
     </div>

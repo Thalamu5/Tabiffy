@@ -8,7 +8,7 @@ import os
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,10 +17,11 @@ from pydantic import Field
 from . import __version__, jobs, storage
 from .midi_export import score_to_midi
 from .models import CapoSuggestion, SolverSettings, TabiffyScore, TargetInstrument, _Model
-from .pipeline import ResolveOptions, build_track, relabel_chords, suggest_capo
+from .pipeline import ResolveOptions, build_track, relabel_chords, solve_all, suggest_capo
 from .tunings import TUNINGS
 
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+CHUNK = 1024 * 1024
 
 app = FastAPI(title="Tabiffy API", version=__version__)
 app.add_middleware(
@@ -91,18 +92,29 @@ def tunings() -> dict:
 
 
 @app.post("/api/jobs")
-async def create_job(file: UploadFile = File(...)) -> dict:
+async def create_job(file: UploadFile = File(...), mode: str = Form("full")) -> dict:
+    """Upload a MIDI or audio file. `mode` (audio only): "full" = a whole song (separate the
+    instruments), or a solo recording of "guitar" | "bass" | "piano" | "other"."""
     filename = file.filename or "upload"
     try:
-        jobs.check_file(filename)
+        kind = jobs.file_kind(filename)
     except jobs.UnsupportedFile as e:
         raise HTTPException(415, str(e)) from None
-    data = await file.read(MAX_UPLOAD_BYTES + 1)
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "File is too large (20 MB max)")
-    if not data:
+    if mode not in jobs.AUDIO_MODES:
+        raise HTTPException(422, f"mode must be one of {sorted(jobs.AUDIO_MODES)}")
+    job_id = storage.new_job(filename, options={"mode": mode, "kind": kind})
+    size = 0
+    with storage.input_path(job_id, filename).open("wb") as out:
+        while chunk := await file.read(CHUNK):
+            size += len(chunk)
+            if size > MAX_UPLOAD_BYTES:
+                out.close()
+                storage.delete_job_dir(job_id)
+                raise HTTPException(413, "File is too large (200 MB max)")
+            out.write(chunk)
+    if size == 0:
+        storage.delete_job_dir(job_id)
         raise HTTPException(400, "The file is empty")
-    job_id = storage.new_job(filename, data)
     jobs.submit(job_id)
     return {"jobId": job_id}
 
@@ -170,6 +182,54 @@ def capo_suggestion(score_id: str, req: ResolveRequest) -> CapoSuggestion:
     score.tracks[idx].capo_suggestion = suggestion
     storage.write_score(score_id, score)
     return suggestion
+
+
+@app.get("/api/scores/{score_id}/audio")
+def score_audio(score_id: str) -> FileResponse:
+    """The original recording (as MP3) for audio-transcribed scores."""
+    try:
+        return FileResponse(storage.audio_preview(score_id), media_type="audio/mpeg")
+    except KeyError:
+        raise HTTPException(404, "This score has no audio") from None
+
+
+class TimingRequest(_Model):
+    time_signature: tuple[int, int] = (4, 4)
+    bpm: float | None = Field(None, ge=20, le=400)  # MIDI scores: set the tempo
+    tempo_factor: float = 1.0  # audio scores: 0.5 (half time), 1, or 2 (double time)
+    downbeat_shift: int = Field(0, ge=0, le=11)  # audio scores: move bar lines by N beats
+
+
+@app.post("/api/scores/{score_id}/timing")
+def timing(score_id: str, req: TimingRequest) -> Response:
+    """Fix the detected tempo / time signature / bar lines and re-solve every track."""
+    score = _score_or_404(score_id)
+    num, den = req.time_signature
+    if not (1 <= num <= 12 and den in (2, 4, 8, 16)):
+        raise HTTPException(422, "Unsupported time signature")
+    try:
+        source = storage.read_stage(score_id, "1b_source")
+    except KeyError:
+        raise HTTPException(409, "Source data for this score is missing") from None
+    if score.audio is not None:
+        if den != 4:
+            raise HTTPException(422, "For audio, choose a time signature over 4 (e.g. 3/4, 4/4)")
+        if req.tempo_factor not in (0.5, 1.0, 2.0):
+            raise HTTPException(422, "tempoFactor must be 0.5, 1 or 2")
+        from .audio.pipeline import retime
+
+        source, score = retime(storage.stages_dir(score_id), score, req.tempo_factor, req.downbeat_shift % num, num)
+    else:
+        source.meta.time_signature = (num, den)
+        if req.bpm:
+            ratio = req.bpm / (source.tempo_map[0].bpm or 120.0)
+            for tp in source.tempo_map:
+                tp.bpm = round(tp.bpm * ratio, 3)
+            source.meta.bpm = source.tempo_map[0].bpm
+        score = solve_all(source, score.settings, previous=score)
+    storage.write_stage(score_id, "1b_source", source)
+    storage.write_score(score_id, score)
+    return Response(score.to_json(), media_type="application/json")
 
 
 @app.get("/api/scores/{score_id}/export")

@@ -15,7 +15,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e ".[dev]"
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # PyTorch/Demucs are skipped in CI (very large); their wrapper test is skipped without them.
+      - run: pip install -e ".[dev,audio,queue]" && pip install --no-deps basic-pitch==0.4.0
       - run: ruff check . ../scripts
       - run: ruff format --check . ../scripts
       - run: pytest -q

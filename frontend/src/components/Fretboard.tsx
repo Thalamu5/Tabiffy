@@ -1,3 +1,4 @@
+import { isUncertain } from '../lib/alphaTabScore'
 import { nameToMidi, pitchClassName } from '../lib/music'
 import type { Note, Track } from '../lib/types'
 
@@ -55,7 +56,7 @@ export function Fretboard({ track, active, upcoming, leftHanded }: Props) {
     const label = isOpen ? '0' : n.finger !== undefined && n.finger !== 0 ? String(n.finger) : ''
     return (
       <g key={`${ghost ? 'g' : 'a'}-${n.id}`} opacity={ghost ? 0.35 : 1}>
-        <circle cx={x} cy={y} r={9} className={isOpen ? 'fb-open' : n.flags.includes('outOfRange') || n.flags.includes('hardFingering') ? 'fb-note fb-warn' : 'fb-note'} />
+        <circle cx={x} cy={y} r={9} className={isOpen ? 'fb-open' : isUncertain(n) ? 'fb-note fb-warn' : 'fb-note'} />
         {!ghost && <text x={x} y={y + 4} className="fb-finger">{label}</text>}
       </g>
     )

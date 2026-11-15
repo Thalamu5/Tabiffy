@@ -87,10 +87,28 @@ def test_save_and_export(client, fixtures_dir):
     assert mid.status_code == 200 and mid.content[:4] == b"MThd"
 
 
-def test_rejects_audio_for_now(client):
-    r = client.post("/api/jobs", files={"file": ("song.mp3", b"ID3...", "audio/mpeg")})
+def test_rejects_unknown_file_types(client):
+    r = client.post("/api/jobs", files={"file": ("notes.txt", b"hello", "text/plain")})
     assert r.status_code == 415
     assert "MIDI" in r.json()["detail"]
+
+
+def test_rejects_bad_mode(client, fixtures_dir):
+    path = fixtures_dir / "bass_line.mid"
+    r = client.post("/api/jobs", files={"file": (path.name, path.read_bytes())}, data={"mode": "kazoo"})
+    assert r.status_code == 422
+
+
+def test_midi_timing_override(client, fixtures_dir):
+    sid = upload(client, fixtures_dir / "chord_progression.mid")
+    before = client.get(f"/api/scores/{sid}").json()
+    r = client.post(f"/api/scores/{sid}/timing", json={"timeSignature": [3, 4], "bpm": 120})
+    assert r.status_code == 200, r.text
+    score = r.json()
+    assert score["meta"]["timeSignature"] == [3, 4]
+    assert score["tempoMap"][0]["bpm"] == 120
+    assert len(score["tracks"][0]["notes"]) == len(before["tracks"][0]["notes"])
+    assert client.get(f"/api/scores/{sid}/audio").status_code == 404
 
 
 def test_bad_ids_are_404(client):

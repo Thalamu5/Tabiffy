@@ -14,6 +14,22 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+# Audio -> notes (M2). Also install Basic Pitch itself WITHOUT its dependencies, because its
+# published requirements pull in TensorFlow and an old numpy; we use its ONNX model instead:
+#   pip install --no-deps basic-pitch==0.4.0
+audio = [
+  "librosa>=0.10",
+  "soundfile>=0.12",
+  "scipy>=1.10",
+  "onnxruntime>=1.16",
+  "pretty_midi>=0.2.10",
+  "mir_eval>=0.7",
+  "resampy>=0.4",
+]
+# Stem separation for full songs (M3). Large download (PyTorch).
+separation = ["torch>=2.1", "torchaudio>=2.1", "demucs>=4.0"]
+# Background job queue (set TABIFFY_REDIS_URL and run `rq worker tabiffy`).
+queue = ["rq>=1.16", "redis>=5"]
 
 [build-system]
 requires = ["setuptools>=68"]

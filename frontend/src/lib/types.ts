@@ -25,7 +25,7 @@ export interface Note {
 export interface Track {
   id: string
   name: string
-  sourceInstrument: 'guitar' | 'bass' | 'piano' | 'other'
+  sourceInstrument: 'guitar' | 'bass' | 'piano' | 'vocals' | 'other'
   targetInstrument: TargetInstrument
   /** low -> high, e.g. ["E2","A2","D3","G3","B3","E4"] */
   tuning: string[]
@@ -58,6 +58,21 @@ export interface SolverSettings {
   quantize: 'off' | '1/8' | '1/16' | '1/16+triplets' | '1/32'
 }
 
+export type AudioMode = 'full' | 'guitar' | 'bass' | 'piano' | 'other'
+
+/** Present when the score was transcribed from a recording. */
+export interface AudioInfo {
+  durationSeconds: number
+  separated: boolean
+  mode: AudioMode
+  detectedBpm: number
+  tempoFactor: number
+  downbeatShift: number
+  /** where score ticks fall in the original recording */
+  syncPoints: { tick: number; seconds: number }[]
+  warnings: string[]
+}
+
 export interface TabiffyScore {
   version: number
   meta: {
@@ -73,6 +88,7 @@ export interface TabiffyScore {
   chords: ChordLabel[]
   tracks: Track[]
   settings: SolverSettings
+  audio?: AudioInfo
 }
 
 export interface Job {
@@ -80,9 +96,11 @@ export interface Job {
   filename: string
   status: 'queued' | 'running' | 'done' | 'error'
   stage: string
+  stageLabel?: string
   progress: number
   error: string | null
   scoreId?: string
+  options?: { mode?: AudioMode; kind?: 'midi' | 'audio' }
 }
 
 export interface TuningPreset {
