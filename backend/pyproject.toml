@@ -26,8 +26,6 @@ audio = [
   "mir_eval>=0.7",
   "resampy>=0.4",
 ]
-# Stem separation for full songs (M3). Large download (PyTorch).
-separation = ["torch>=2.1", "torchaudio>=2.1", "demucs>=4.0"]
 # Background job queue (set TABIFFY_REDIS_URL and run `rq worker tabiffy`).
 queue = ["rq>=1.16", "redis>=5"]
 

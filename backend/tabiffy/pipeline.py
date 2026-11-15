@@ -52,16 +52,15 @@ def _chord_lookup(chords: list[ChordLabel]):
     return at
 
 
-def build_track(score: TabiffyScore, source: Track, opts: ResolveOptions, track_id: str) -> tuple[Track, float]:
-    """Stages 6-8 for one track. Returns the output track and the solver cost."""
-    cfg = load_config()
+def prepare_notes(score: TabiffyScore, source: Track, opts: ResolveOptions) -> list[Note]:
+    """Stages 6 + 8 for one track: map into the instrument's range, then snap to the rhythm grid.
+    These are all the notes the track should contain, before the solver drops any it can't fit."""
     s = opts.settings
     target = opts.target
     tuning = opts.tuning or default_tuning(target)
     open_midi = tuning_midi(tuning) if target != "piano" else []
     capo = opts.capo if target != "piano" else 0
     tpq = score.ticks_per_quarter
-    tempo = TempoMap(score.tempo_map, tpq)
 
     # Locked notes replace their source counterparts (matched by id).
     locked = {n.id: n for n in opts.locked_notes}
@@ -75,7 +74,20 @@ def build_track(score: TabiffyScore, source: Track, opts: ResolveOptions, track_
     notes = map_to_range(notes, lo, hi, opts.transpose, phrase_gap_ticks=_bar_ticks(score), comfort=comfort)
     # 8. quantize (locked notes keep their timing)
     free = quantize_notes([n for n in notes if not n.user_edited], tpq, s.quantize)
-    notes = sorted(free + [n for n in notes if n.user_edited], key=lambda n: (n.tick, n.midi))
+    return sorted(free + [n for n in notes if n.user_edited], key=lambda n: (n.tick, n.midi))
+
+
+def build_track(score: TabiffyScore, source: Track, opts: ResolveOptions, track_id: str) -> tuple[Track, float]:
+    """Stages 6-8 for one track. Returns the output track and the solver cost."""
+    cfg = load_config()
+    s = opts.settings
+    target = opts.target
+    tuning = opts.tuning or default_tuning(target)
+    open_midi = tuning_midi(tuning) if target != "piano" else []
+    capo = opts.capo if target != "piano" else 0
+    tpq = score.ticks_per_quarter
+    tempo = TempoMap(score.tempo_map, tpq)
+    notes = prepare_notes(score, source, opts)
 
     cost = 0.0
     if target == "piano":
@@ -114,8 +126,27 @@ def build_track(score: TabiffyScore, source: Track, opts: ResolveOptions, track_
     return track, cost
 
 
-def relabel_chords(score: TabiffyScore) -> None:
-    notes = [n for t in score.tracks for n in t.notes]
+def relabel_chords(score: TabiffyScore, source: TabiffyScore | None = None) -> None:
+    """Name the chords. With `source`, uses every note each track should contain (after range
+    mapping and quantizing), so notes the solver had to drop from a dense chord still count."""
+    if source is None:
+        notes = [n for t in score.tracks for n in t.notes]
+    else:
+        notes = []
+        for i, t in enumerate(score.tracks):
+            idx = t.source_track_index if t.source_track_index is not None else i
+            if not 0 <= idx < len(source.tracks):
+                notes += t.notes
+                continue
+            opts = ResolveOptions(
+                target=t.target_instrument,
+                tuning=t.tuning or None,
+                capo=t.capo,
+                transpose=t.transpose_semitones,
+                settings=score.settings,
+                locked_notes=[n for n in t.notes if n.user_edited],
+            )
+            notes += prepare_notes(source, source.tracks[idx], opts)
     num, den = score.meta.time_signature
     tpq = score.ticks_per_quarter
     score.chords = label_chords(notes, tpq, num, round(tpq * 4 / den))
@@ -173,7 +204,7 @@ def solve_all(
         track, _ = build_track(source, src, opts, track_id)
         track.name = name
         out.tracks.append(track)
-    relabel_chords(out)
+    relabel_chords(out, source)
     return out
 
 

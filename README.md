@@ -7,14 +7,15 @@ The full product brief is in [SPEC.md](SPEC.md).
 
 ## What works
 
-v0.1 covered milestones **M0** (skeleton) and **M1** (MIDI → tab). v0.2 adds **M2** (audio → notes) and the
-stem-separation part of **M3** (full songs).
+v0.1 covered milestones **M0** (skeleton) and **M1** (MIDI → tab). v0.2 adds **M2** (audio → notes).
+Tabiffy does **not** separate instruments itself: to tab one instrument from a band recording, split it out
+first with a stem-separation tool of your choice and upload that part.
 
 | Feature | Status |
 |---|---|
 | Upload **audio** (mp3, wav, flac, ogg, m4a, up to 15 min) or **MIDI** | ✅ |
-| **Full songs:** Demucs splits the mix into guitar, bass, piano, vocals, other (drums are ignored) | ✅ |
-| **Solo recordings:** choose "solo guitar / bass / piano / other" to skip separation (faster, more accurate) | ✅ |
+| Say what's in the file (guitar, bass, piano, vocals, other, or a full band mix) to tune note detection | ✅ |
+| Full band mixes are transcribed as one part, with drum hits filtered out first | ✅ (rough) |
 | Note detection with Spotify's **Basic Pitch** on each part | ✅ |
 | Tempo, beats, bar lines and 3/4 vs 4/4 detection; key detection | ✅ |
 | Fix the timing yourself: half/double tempo, shift bar lines, change time signature | ✅ |
@@ -27,18 +28,17 @@ stem-separation part of **M3** (full songs).
 | Animated **fretboard** and **piano** | ✅ |
 | Export **.gp** (Guitar Pro 7/8), **.mid**, **PDF** | ✅ |
 | Tab editor (click a note to fix it) | ⏳ M5 |
-| MuScriptor (a stronger transcription model) | ⏳ Later in M3, once its weights license is checked |
+| MuScriptor (a stronger transcription model) | ⏳ Later, once its weights license is checked |
 
-### What to expect from full songs
+### What to expect
 
-Automatic transcription of full band recordings is still an unsolved problem. Expect the main riffs and
-chords to come through and plenty of wrong or missing notes, especially in busy, distorted or heavily
-produced songs. Clean, well-separated guitar parts work best. The red notes and the original-audio mode
-are there to help you spot and judge the mistakes; the editor (M5) is how they'll get fixed.
+Automatic transcription is far from perfect. A clean recording of one instrument (or a well-separated
+part) gives the best results; a full band mix gives rough results, since instruments mask each other.
+Guitar techniques (bends, slides, hammer-ons) aren't detected yet. The red notes and the original-audio
+mode are there to help you spot and judge mistakes; the editor (M5) is how they'll get fixed.
 
-**Processing time:** without a graphics card, separating a full song takes several minutes (it depends a
-lot on the machine and hasn't been benchmarked yet); note detection adds under a minute for a typical song.
-With an NVIDIA GPU, separation is much faster.
+**Processing time:** in testing on a 4-core machine, a 4-minute recording took about 13 seconds as a
+single instrument and about 22 seconds as a full mix (no graphics card needed).
 
 ## Running it
 
@@ -50,9 +50,8 @@ Install [Docker Desktop](https://www.docker.com/products/docker-desktop/), then 
 docker compose up --build
 ```
 
-Open <http://localhost:8000>. The **first build takes a while** (it downloads PyTorch and the ~80 MB
-Demucs model, a few GB in total); later starts are quick. This runs three services: the web app, a
-background worker that processes uploads, and Redis (the queue between them).
+Open <http://localhost:8000>. The first build takes a few minutes; later starts are quick. This runs three
+services: the web app, a background worker that processes uploads, and Redis (the queue between them).
 
 ### Option B: for development
 
@@ -62,8 +61,7 @@ Needs **Python 3.11+**, **Node.js 20+** and **ffmpeg** (for audio).
 ./scripts/dev.sh
 ```
 
-Open <http://localhost:5173>. The first run installs everything (including PyTorch, so it takes a while);
-code changes reload automatically. Here uploads are processed inside the backend; set `TABIFFY_REDIS_URL`
+Open <http://localhost:5173>. The first run installs everything; code changes reload automatically. Here uploads are processed inside the backend; set `TABIFFY_REDIS_URL`
 and run `rq worker tabiffy` to use a separate worker like Docker does.
 
 ## Running the tests
@@ -78,7 +76,7 @@ GitHub Actions runs these, plus linting and type checks, on every push (`.github
 ## How it works
 
 ```
-upload ─► decode (ffmpeg) ─► separate (Demucs) ─► notes per part (Basic Pitch) ─► beats/bars/key (librosa)
+upload ─► decode (ffmpeg) ─► [full mix: filter out drums] ─► notes (Basic Pitch) ─► beats/bars/key (librosa)
        └─ MIDI files skip straight to ───────────────────────────────────────────────► map to instrument range
                                                     ─► rhythm grid ─► fret/finger solver ─► TabiffyScore JSON
 ```
@@ -89,7 +87,7 @@ frontend/  React + TypeScript + Vite. alphaTab draws the score, plays it (synth 
   src/lib/alphaTabScore.ts   red uncertain notes, sync points to the original recording
   src/components/            ScoreView (player), Fretboard, Piano, SettingsPanel, TimingPanel, Upload
 backend/   Python + FastAPI
-  tabiffy/audio/             decode, separate (Demucs), transcribe (Basic Pitch), beats, grid, pipeline
+  tabiffy/audio/             decode, transcribe (Basic Pitch), beats, grid, pipeline
   tabiffy/midi_import.py     MIDI input
   tabiffy/mapping.py         transpose / octave-shift into the instrument's range
   tabiffy/quantize.py        snap to the rhythm grid
@@ -115,15 +113,16 @@ the timing re-uses the stored notes, so nothing is transcribed twice.
 - **Basic Pitch runs its ONNX model** (no TensorFlow), installed with `--no-deps` (see `backend/pyproject.toml`).
 - **"Confidence" is a heuristic** from Basic Pitch's note strength and length, not a calibrated probability.
 - **No Postgres yet.** Scores are JSON files in the data folder; Redis is used for the job queue only.
-  Large WAV intermediates (stems) are deleted after processing; the notes, beats and an MP3 are kept.
+  The large decoded WAV is deleted after processing; the notes, beats and an MP3 are kept.
 - **Quantize runs before the solver**, and the solver keeps the best 24 voicings per slice instead of windowing.
 - **PDF** uses alphaTab's print view; server-side PDFs are v1.1.
 
 ## Known limitations
 
 - Techniques (bends, slides, hammer-ons, vibrato) aren't detected from audio yet.
-- Vocals become a single melody line; drums are ignored (non-goal).
-- Each part (or MIDI track) is its own track; merging tracks isn't in the UI yet.
+- Vocals become a single melody line; drums aren't transcribed (non-goal).
+- One audio file = one part. Combining several separately uploaded parts into one score isn't supported yet.
+- Each MIDI track is its own track; merging tracks isn't in the UI yet.
 - Chord names are a heuristic and can be wrong on busy arrangements.
 - Time signatures for audio are x/4 only (no 6/8 yet).
 
@@ -131,5 +130,5 @@ the timing re-uses the stored notes, so nothing is transcribed twice.
 
 1. **UI/UX pass** based on testing with real songs.
 2. **M5 – Editor:** click-to-edit notes, keyboard entry, undo/redo, autosave, re-solve around locked notes.
-3. **M3 (rest):** MuScriptor as an alternative transcriber once its weights license is confirmed; pick which parts to keep.
+3. MuScriptor as an alternative transcriber once its weights license is confirmed.
 4. Accuracy tracking: `mir_eval` note F1 on GuitarSet / MAESTRO samples as a nightly job.

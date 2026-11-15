@@ -1,10 +1,5 @@
-"""Audio pipeline tests on synthesized recordings with known notes.
+"""Audio pipeline tests on synthesized recordings with known notes."""
 
-Demucs itself isn't run here (its weights are an ~80 MB download); a stand-in returns the
-true instrument parts, so everything around it is tested for real.
-"""
-
-import shutil
 import time
 
 import numpy as np
@@ -14,7 +9,6 @@ from audio_synth import band, write
 pytest.importorskip("librosa")
 pytest.importorskip("basic_pitch")
 
-from tabiffy.audio import separate as sep  # noqa: E402
 from tabiffy.audio.beats import BeatInfo, detect_beats, meter_and_downbeat  # noqa: E402
 from tabiffy.audio.grid import BeatGrid  # noqa: E402
 from tabiffy.audio.pipeline import import_audio, retime  # noqa: E402
@@ -28,19 +22,6 @@ def recording(tmp_path_factory):
     paths = {k: write(d / f"true_{k}.wav", v) for k, v in stems.items()}
     mix = write(d / "song.wav", sum(stems.values()))
     return {"dir": d, "stems": paths, "mix": mix, "truth": truth}
-
-
-@pytest.fixture
-def fake_demucs(monkeypatch, recording):
-    def fake(wav, out_dir, on_progress=None):
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out = {}
-        for k, v in recording["stems"].items():
-            out[k] = out_dir / f"{k}.wav"
-            shutil.copy(v, out[k])
-        return out
-
-    monkeypatch.setattr(sep, "separate", fake)
 
 
 # --- beat grid -------------------------------------------------------------------
@@ -127,24 +108,23 @@ def test_beat_tracking(recording):
     assert b.beat_times[b.downbeat_index] < 0.2  # the first downbeat is the start of the song
 
 
-def test_full_song_pipeline(tmp_path, recording, fake_demucs):
+def test_guitar_part_pipeline(tmp_path, recording):
+    """A guitar part (e.g. separated by the user beforehand) -> tab, chords, timing, sync points."""
     start = time.perf_counter()
     stages = []
     source, score = import_audio(
-        recording["mix"], tmp_path / "work", "my_song.wav", "full", on_stage=lambda s, p: stages.append(s)
+        recording["stems"]["guitar"], tmp_path / "work", "my_song.wav", "guitar", on_stage=lambda s, p: stages.append(s)
     )
     assert time.perf_counter() - start < 60
-    assert stages[0] == "decode" and "separate" in stages and "beats" in stages
-    assert [t.name for t in score.tracks] == ["Guitar", "Bass"]
-    assert score.tracks[1].target_instrument == "bass"
-    assert tuple(score.meta.time_signature) == (4, 4)
+    assert stages[:3] == ["decode", "transcribe", "beats"]
+    assert [t.name for t in score.tracks] == ["Guitar"]
     assert score.meta.key == "C major"
-    assert [c.symbol for c in score.chords][:4] == ["C", "G", "Am", "F"]
+    assert score.meta.bpm == pytest.approx(100, rel=0.03) or score.meta.bpm == pytest.approx(50, rel=0.03)
     gtr = score.tracks[0]
     assert all(n.string and n.fret is not None and 0 <= n.confidence <= 1 for n in gtr.notes)
-    assert score.audio and score.audio.separated and score.audio.sync_points
+    assert score.audio and score.audio.mode == "guitar" and score.audio.sync_points
     assert (tmp_path / "work" / "audio.mp3").exists()
-    assert not (tmp_path / "work" / "decoded.wav").exists()  # big intermediates are cleaned up
+    assert not (tmp_path / "work" / "decoded.wav").exists()  # the big intermediate is cleaned up
 
     # half time: same notes, half as many beats
     _, slow = retime(tmp_path / "work", score, 0.5, 0, 4)
@@ -153,24 +133,18 @@ def test_full_song_pipeline(tmp_path, recording, fake_demucs):
     assert len(slow.tracks[0].notes) > 0.8 * len(gtr.notes)
 
 
-def test_solo_mode_skips_separation(tmp_path, recording, monkeypatch):
-    def boom(*a, **k):
-        raise AssertionError("separation should not run for solo recordings")
-
-    monkeypatch.setattr(sep, "separate", boom)
-    _, score = import_audio(recording["stems"]["guitar"], tmp_path / "w", "solo.wav", "guitar")
-    assert [t.name for t in score.tracks] == ["Guitar"]
-    assert score.audio.separated is False
-
-
-def test_falls_back_to_full_mix_without_demucs(tmp_path, recording, monkeypatch):
-    def unavailable(*a, **k):
-        raise sep.SeparationUnavailable("no weights")
-
-    monkeypatch.setattr(sep, "separate", unavailable)
-    _, score = import_audio(recording["mix"], tmp_path / "w", "song.wav", "full")
+def test_band_mix_finds_the_chords(tmp_path, recording):
+    _, score = import_audio(recording["mix"], tmp_path / "w", "song.wav", "mix")
     assert [t.name for t in score.tracks] == ["Full mix"]
-    assert score.audio.warnings
+    assert tuple(score.meta.time_signature) == (4, 4)
+    assert score.meta.bpm == pytest.approx(100, rel=0.03)
+    assert [c.symbol for c in score.chords][:4] == ["C", "G", "Am", "F"]
+
+
+def test_bass_part_goes_to_bass(tmp_path, recording):
+    _, score = import_audio(recording["stems"]["bass"], tmp_path / "w", "bass.wav", "bass")
+    assert score.tracks[0].target_instrument == "bass"
+    assert len(score.tracks[0].tuning) == 4
 
 
 def test_rejects_non_audio(tmp_path):
@@ -182,31 +156,8 @@ def test_rejects_non_audio(tmp_path):
         decode(bad, tmp_path / "out.wav")
 
 
-def test_demucs_wrapper_writes_stems(tmp_path, recording, monkeypatch):
-    """The tensor plumbing around Demucs, with a stand-in model."""
-    torch = pytest.importorskip("torch")
-    pytest.importorskip("demucs")
-    import demucs.apply
-
-    class FakeModel:
-        samplerate = 44100
-        sources = ["drums", "bass", "other", "vocals", "guitar", "piano"]
-
-    def fake_apply(model, mix, **kw):
-        kw["callback"]({"segment_offset": mix.shape[-1] - 1})
-        return torch.stack([mix[0] * (i + 1) / 10 for i in range(len(model.sources))])[None]
-
-    monkeypatch.setattr(sep, "_model", FakeModel())
-    monkeypatch.setattr(demucs.apply, "apply_model", fake_apply)
-    progress = []
-    stems = sep.separate(recording["mix"], tmp_path / "stems", progress.append)
-    assert set(stems) == set(FakeModel.sources)
-    assert all(p.exists() for p in stems.values())
-    assert progress and progress[-1] == pytest.approx(1.0)
-
-
 # --- API ---------------------------------------------------------------------
-def test_audio_upload_through_the_api(tmp_path, monkeypatch, recording, fake_demucs):
+def test_audio_upload_through_the_api(tmp_path, monkeypatch, recording):
     from fastapi.testclient import TestClient
 
     monkeypatch.setenv("TABIFFY_DATA_DIR", str(tmp_path))
@@ -214,7 +165,7 @@ def test_audio_upload_through_the_api(tmp_path, monkeypatch, recording, fake_dem
 
     client = TestClient(app)
     r = client.post(
-        "/api/jobs", files={"file": ("song.wav", recording["mix"].read_bytes(), "audio/wav")}, data={"mode": "full"}
+        "/api/jobs", files={"file": ("song.wav", recording["mix"].read_bytes(), "audio/wav")}, data={"mode": "mix"}
     )
     assert r.status_code == 200, r.text
     job_id = r.json()["jobId"]
@@ -225,7 +176,7 @@ def test_audio_upload_through_the_api(tmp_path, monkeypatch, recording, fake_dem
         time.sleep(0.1)
     assert job["status"] == "done", job
     score = client.get(f"/api/scores/{job_id}").json()
-    assert score["audio"]["syncPoints"] and score["audio"]["separated"]
+    assert score["audio"]["syncPoints"] and score["audio"]["mode"] == "mix"
     audio = client.get(f"/api/scores/{job_id}/audio")
     assert audio.status_code == 200 and audio.headers["content-type"] == "audio/mpeg"
 

@@ -1,5 +1,5 @@
 # app: web app + API on http://localhost:8000
-# worker: runs uploads in the background (instrument separation + transcription)
+# worker: processes uploads in the background (note detection, beats, fingering)
 # redis: the job queue between them
 services:
   app:

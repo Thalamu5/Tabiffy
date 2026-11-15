@@ -108,8 +108,7 @@ class AudioInfo(_Model):
     """Present when the score was transcribed from an audio file."""
 
     duration_seconds: float = 0.0
-    separated: bool = False  # stems were split with Demucs
-    mode: str = "full"  # "full" or a solo instrument: "guitar" | "bass" | "piano" | "other"
+    mode: str = "guitar"  # what the file contains: "guitar" | "bass" | "piano" | "vocals" | "other" | "mix"
     detected_bpm: float = 120.0
     tempo_factor: float = 1.0  # user override: 0.5 = half time, 2 = double time
     downbeat_shift: int = 0  # user override: move bar lines by N beats

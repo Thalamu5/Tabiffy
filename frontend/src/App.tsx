@@ -193,9 +193,6 @@ export default function App() {
           <p>Working on <strong>{job.filename}</strong></p>
           <p className="muted">{job.stageLabel ?? job.stage}…</p>
           <div className="progress"><div style={{ width: `${Math.round(job.progress * 100)}%` }} /></div>
-          {job.options?.kind === 'audio' && job.options.mode === 'full' && (
-            <p className="hint">Separating the instruments takes a few minutes for a full song (faster with a graphics card). You can leave this page open.</p>
-          )}
         </div>
       )}
 

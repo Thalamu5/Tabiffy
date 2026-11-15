@@ -14,7 +14,7 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function uploadFile(file: File, mode: AudioMode = 'full'): Promise<string> {
+export async function uploadFile(file: File, mode: AudioMode = 'guitar'): Promise<string> {
   const form = new FormData()
   form.append('file', file)
   form.append('mode', mode)

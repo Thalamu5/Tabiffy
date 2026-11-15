@@ -12,9 +12,9 @@ if ! command -v ffmpeg >/dev/null; then
   echo "      macOS: brew install ffmpeg · Ubuntu: sudo apt install ffmpeg · Windows: winget install ffmpeg"
 fi
 if [ ! -d backend/.venv ]; then
-  echo "Setting up Python environment (first run only, downloads PyTorch, can take a while)…"
+  echo "Setting up Python environment (first run only)…"
   python3 -m venv backend/.venv
-  backend/.venv/bin/pip install -q -e "backend[dev,audio,separation]"
+  backend/.venv/bin/pip install -q -e "backend[dev,audio]"
   backend/.venv/bin/pip install -q --no-deps basic-pitch==0.4.0
 fi
 if [ ! -d frontend/node_modules ]; then

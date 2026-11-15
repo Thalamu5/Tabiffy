@@ -23,7 +23,7 @@ const score: TabiffyScore = {
     ],
   }],
   audio: {
-    durationSeconds: 5, separated: true, mode: 'full', detectedBpm: 100, tempoFactor: 1, downbeatShift: 0, warnings: [],
+    durationSeconds: 5, mode: 'guitar', detectedBpm: 100, tempoFactor: 1, downbeatShift: 0, warnings: [],
     syncPoints: [{ tick: 0, seconds: 0.1 }, { tick: 960, seconds: 0.7 }, { tick: 3840, seconds: 2.5 }],
   },
 }

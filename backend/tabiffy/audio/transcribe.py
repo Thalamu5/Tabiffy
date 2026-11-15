@@ -27,9 +27,11 @@ PROFILES: dict[str, tuple[float | None, float | None, float, float, float]] = {
     "piano": (26.0, 4200.0, 0.5, 0.3, 60.0),
     "vocals": (80.0, 1100.0, 0.55, 0.35, 120.0),
     "other": (60.0, 2100.0, 0.55, 0.35, 90.0),
+    # a whole band mix: wide range and more sensitive, since instruments mask each other
+    "mix": (28.0, 4200.0, 0.4, 0.25, 80.0),
 }
 MONOPHONIC = {"vocals", "bass"}
-SILENCE_RMS = 0.005  # stems quieter than this are treated as empty
+SILENCE_RMS = 0.005  # recordings quieter than this are treated as empty
 
 _model = None
 
@@ -54,6 +56,19 @@ def stem_rms(wav_path: Path) -> float:
 
     audio, _ = sf.read(str(wav_path), dtype="float32", always_2d=True)
     return float(np.sqrt(np.mean(audio**2))) if audio.size else 0.0
+
+
+def remove_drums(wav_path: Path, out_path: Path) -> Path:
+    """Harmonic/percussive split (librosa HPSS): keeps sustained, pitched sound and drops most
+    drum hits, which otherwise get transcribed as low notes. Used for full-mix uploads."""
+    import librosa
+    import numpy as np
+    import soundfile as sf
+
+    y, sr = librosa.load(str(wav_path), sr=22050, mono=True)
+    harmonic = librosa.effects.harmonic(y, margin=2.0)
+    sf.write(str(out_path), np.asarray(harmonic, dtype=np.float32), sr)
+    return out_path
 
 
 def keep_one_line(notes: list[RawNote], prefer: str) -> list[RawNote]:

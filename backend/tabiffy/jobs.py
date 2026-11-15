@@ -22,14 +22,14 @@ _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tabiffy-job")
 
 MIDI_EXTS = {".mid", ".midi", ".smf"}
 AUDIO_EXTS = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".aiff", ".aif"}
-AUDIO_MODES = {"full", "guitar", "bass", "piano", "other"}
+AUDIO_MODES = {"guitar", "bass", "piano", "vocals", "other", "mix"}
 JOB_TIMEOUT_SECONDS = 60 * 60
 
 STAGE_LABELS = {
     "queued": "Waiting in line",
     "decode": "Reading the file",
     "analyze": "Analyzing",
-    "separate": "Separating the instruments",
+    "transcribe": "Listening for notes",
     "beats": "Finding the beat",
     "solve": "Working out fingerings",
     "chords": "Naming chords",
@@ -56,9 +56,6 @@ def check_file(filename: str) -> None:
 
 
 def stage_label(stage: str) -> str:
-    if stage.startswith("transcribe:"):
-        part = stage.split(":", 1)[1]
-        return f"Listening for notes: {part}"
     return STAGE_LABELS.get(stage, stage)
 
 
@@ -77,7 +74,7 @@ def run_job(job_id: str) -> None:
             from .audio.decode import AudioError
             from .audio.pipeline import import_audio
 
-            mode = job.get("options", {}).get("mode", "full")
+            mode = job.get("options", {}).get("mode", "guitar")
             try:
                 source, score = import_audio(path, storage.stages_dir(job_id), job["filename"], mode, on_stage=on_stage)
             except AudioError as e:

@@ -58,12 +58,12 @@ export interface SolverSettings {
   quantize: 'off' | '1/8' | '1/16' | '1/16+triplets' | '1/32'
 }
 
-export type AudioMode = 'full' | 'guitar' | 'bass' | 'piano' | 'other'
+/** What an audio upload contains. 'mix' = a whole band mix, transcribed as one part. */
+export type AudioMode = 'guitar' | 'bass' | 'piano' | 'vocals' | 'other' | 'mix'
 
 /** Present when the score was transcribed from a recording. */
 export interface AudioInfo {
   durationSeconds: number
-  separated: boolean
   mode: AudioMode
   detectedBpm: number
   tempoFactor: number

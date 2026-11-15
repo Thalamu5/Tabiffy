@@ -7,7 +7,7 @@ interface Props {
 }
 
 const SAMPLES = [
-  { file: 'demo_band.mp3', label: 'Band recording (audio)', mode: 'full' as AudioMode },
+  { file: 'demo_band.mp3', label: 'Band recording (audio, full mix)', mode: 'mix' as AudioMode },
   { file: 'chord_progression.mid', label: 'Chord progression (MIDI)' },
   { file: 'pentatonic_riff.mid', label: 'Pentatonic riff (MIDI)' },
   { file: 'flute_melody.mid', label: 'Flute melody → guitar (MIDI)' },
@@ -15,17 +15,18 @@ const SAMPLES = [
 ]
 
 const MODES: { value: AudioMode; label: string; hint: string }[] = [
-  { value: 'full', label: 'A full song', hint: 'Separates the instruments first (takes a few minutes)' },
-  { value: 'guitar', label: 'Solo guitar', hint: 'Just one guitar, no band' },
-  { value: 'bass', label: 'Solo bass', hint: '' },
-  { value: 'piano', label: 'Solo piano', hint: '' },
-  { value: 'other', label: 'Another solo instrument', hint: 'e.g. voice, violin, flute' },
+  { value: 'guitar', label: 'Guitar', hint: 'a guitar recording, or a guitar part you separated from a song' },
+  { value: 'bass', label: 'Bass', hint: '' },
+  { value: 'piano', label: 'Piano / keys', hint: '' },
+  { value: 'vocals', label: 'Vocals', hint: 'becomes a single melody line' },
+  { value: 'other', label: 'Another instrument', hint: 'e.g. violin, flute, sax' },
+  { value: 'mix', label: 'A full band mix', hint: 'everything together; rough results' },
 ]
 
 export function Upload({ onFile, busy }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
-  const [mode, setMode] = useState<AudioMode>('full')
+  const [mode, setMode] = useState<AudioMode>('guitar')
 
   const loadSample = async (name: string, sampleMode?: AudioMode) => {
     const res = await fetch(`/samples/${name}`)
@@ -58,7 +59,7 @@ export function Upload({ onFile, busy }: Props) {
       </div>
 
       <fieldset className="modes">
-        <legend>For audio: what's in the recording?</legend>
+        <legend>For audio: what's in the file?</legend>
         {MODES.map((m) => (
           <label key={m.value} className={`mode ${mode === m.value ? 'on' : ''}`}>
             <input type="radio" name="mode" value={m.value} checked={mode === m.value} onChange={() => setMode(m.value)} />
@@ -71,8 +72,9 @@ export function Upload({ onFile, busy }: Props) {
       </fieldset>
 
       <p className="hint">
-        Automatic transcription isn't perfect, especially for full songs. Notes the app is unsure about are shown in red
-        so you know where to check.
+        Each audio file becomes one part. For the best tab from a full song, separate the instrument you want first
+        (with a stem-separation tool) and upload that part. Transcription isn't perfect: notes the app is unsure
+        about are shown in red so you know where to check.
       </p>
 
       <div className="samples">

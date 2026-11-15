@@ -92,9 +92,9 @@ def tunings() -> dict:
 
 
 @app.post("/api/jobs")
-async def create_job(file: UploadFile = File(...), mode: str = Form("full")) -> dict:
-    """Upload a MIDI or audio file. `mode` (audio only): "full" = a whole song (separate the
-    instruments), or a solo recording of "guitar" | "bass" | "piano" | "other"."""
+async def create_job(file: UploadFile = File(...), mode: str = Form("guitar")) -> dict:
+    """Upload a MIDI or audio file. `mode` (audio only) says what the recording contains:
+    "guitar" | "bass" | "piano" | "vocals" | "other", or "mix" for a whole band mix (rough results)."""
     filename = file.filename or "upload"
     try:
         kind = jobs.file_kind(filename)
@@ -168,7 +168,7 @@ def resolve(score_id: str, req: ResolveRequest) -> Response:
     new_track, _ = build_track(source, src_track, opts, req.track_id)
     new_track.name = score.tracks[idx].name
     score.tracks[idx] = new_track
-    relabel_chords(score)
+    relabel_chords(score, source)
     storage.write_score(score_id, score)
     return Response(score.to_json(), media_type="application/json")
 
