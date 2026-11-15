@@ -1,0 +1,13 @@
+# v0.1 runs as a single service (API + web app). Redis/Postgres and a separate
+# GPU worker get added in M2/M3, when audio transcription makes jobs slow.
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - tabiffy-data:/data
+    restart: unless-stopped
+
+volumes:
+  tabiffy-data:
