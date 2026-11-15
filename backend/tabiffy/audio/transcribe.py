@@ -22,7 +22,8 @@ class RawNote:
 
 # Per-instrument Basic Pitch settings: (min Hz, max Hz, onset threshold, frame threshold, min note ms)
 PROFILES: dict[str, tuple[float | None, float | None, float, float, float]] = {
-    "guitar": (75.0, 1400.0, 0.5, 0.3, 80.0),
+    # down to ~40 Hz so drop tunings and 7/8-string low strings are heard (8-string F#1 = 46 Hz)
+    "guitar": (40.0, 1400.0, 0.5, 0.3, 80.0),
     "bass": (28.0, 420.0, 0.45, 0.3, 90.0),
     "piano": (26.0, 4200.0, 0.5, 0.3, 60.0),
     "vocals": (80.0, 1100.0, 0.55, 0.35, 120.0),

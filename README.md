@@ -15,6 +15,9 @@ first with a stem-separation tool of your choice and upload that part.
 |---|---|
 | Upload **audio** (mp3, wav, flac, ogg, m4a, up to 15 min) or **MIDI** | ✅ |
 | Say what's in the file (guitar, bass, piano, vocals, other, or a full band mix) to tune note detection | ✅ |
+| **Tuning detection:** suggests the best-fitting guitar tuning (6, 7 or 8 strings) with reasons and alternatives | ✅ |
+| Or pick the tuning at upload / any time, and the tab sticks to it | ✅ |
+| 6-string (Standard, Eb/D/C/B Standard, Drop D/C#/C/B, DADGAD, Open G/D/E), 7-string (B/A Standard, Drop A), 8-string (F# Standard, Drop E), custom | ✅ |
 | Full band mixes are transcribed as one part, with drum hits filtered out first | ✅ (rough) |
 | Note detection with Spotify's **Basic Pitch** on each part | ✅ |
 | Tempo, beats, bar lines and 3/4 vs 4/4 detection; key detection | ✅ |
@@ -23,7 +26,7 @@ first with a stem-separation tool of your choice and upload that part.
 | **Uncertain notes in red** + "Review next uncertain note" button | ✅ |
 | Background job queue (Redis + worker) with progress per stage | ✅ |
 | Fret + string solver with finger numbers 1–4, barres, stretches | ✅ |
-| Chord names + diagrams, rhythm grid, capo/transpose/tunings, capo suggestions | ✅ |
+| Chord names + diagrams, rhythm grid, capo/transpose, capo suggestions | ✅ |
 | Tab + notation, playback (speed, loop, metronome, count-in, mute/solo) | ✅ |
 | Animated **fretboard** and **piano** | ✅ |
 | Export **.gp** (Guitar Pro 7/8), **.mid**, **PDF** | ✅ |
@@ -104,6 +107,18 @@ drifts; the score gets one steady tempo, and per-beat **sync points** keep the c
 recording. Changing tuning/capo/instrument re-runs only the fast steps (about 0.3 s for 120 bars); changing
 the timing re-uses the stored notes, so nothing is transcribed twice.
 
+### How tuning detection works
+
+Every guitar tuning preset is tried on the detected notes with the real fret solver, and scored on:
+notes it can't reach (below its lowest string), how awkward the resulting tab is (stretches, big jumps;
+open strings count in its favour, which is how drop-tuned riffs give themselves away), low strings that
+nothing needs (so it doesn't suggest an 8-string when a 7 will do), and a small preference for common
+tunings. The lowest ~3% of notes are treated as possible detection errors (octave mistakes, bass bleed).
+
+It's an educated guess: two tunings often fit the same notes (e.g. Drop C vs 7-string B), so the app
+shows its top three with a reason for each. Detection is most reliable on a guitar-only recording; on a
+full band mix, bass notes can pull it toward lower tunings. Weights are in `backend/tabiffy/tuning_suggest.py`.
+
 ## Differences from the spec (deliberate)
 
 - **Beat tracking uses librosa** rather than madmom (unmaintained, doesn't install on current Python) or
@@ -125,6 +140,7 @@ the timing re-uses the stored notes, so nothing is transcribed twice.
 - Each MIDI track is its own track; merging tracks isn't in the UI yet.
 - Chord names are a heuristic and can be wrong on busy arrangements.
 - Time signatures for audio are x/4 only (no 6/8 yet).
+- Tuning detection can't tell tunings apart when the notes fit both equally; more bass tunings come with the bass work.
 
 ## Next steps (from SPEC §9)
 

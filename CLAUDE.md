@@ -21,6 +21,9 @@ the deliberate deviations from the spec.
 - alphaTab differences: alphaTab's `Note.string` counts from the lowest string; alphaTex `{lf n}` is finger+1
   (1 = thumb, 2 = index…).
 - Solver cost weights live in `backend/tabiffy/solver/weights.json`.
+- Tuning presets (with string count, family and a "prior") are in `backend/tabiffy/tunings.py`; tuning suggestion
+  scoring is in `backend/tabiffy/tuning_suggest.py` (tests with known-tuning riffs in `tests/test_tuning_suggest.py`).
+  Uploads take `tuning` = "auto" or a preset key; the solver/fretboard/alphaTex handle any string count (4–8).
 - Audio tests synthesize recordings (`backend/tests/audio_synth.py`); don't commit audio binaries
   other than `frontend/public/samples/demo_band.mp3` (regenerate with `python scripts/make_audio_sample.py`).
 - Install Basic Pitch with `pip install --no-deps basic-pitch==0.4.0` (its declared deps pull TensorFlow).

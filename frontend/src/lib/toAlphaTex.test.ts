@@ -106,6 +106,24 @@ describe('toAlphaTex', () => {
     expect(soundingNotes(s)).toEqual([[0, 48], [0, 72]])
   })
 
+  it.each([
+    [7, ['B1', 'E2', 'A2', 'D3', 'G3', 'B3', 'E4']],
+    [8, ['F#1', 'B1', 'E2', 'A2', 'D3', 'G3', 'B3', 'E4']],
+  ])('renders %i-string tunings with notes on the lowest string', (strings, tuning) => {
+    const base = score([
+      note({ tick: 0, durationTicks: 960, midi: strings === 7 ? 35 : 30, string: strings, fret: 0 }),
+      note({ tick: 960, durationTicks: 960, midi: strings === 7 ? 38 : 33, string: strings, fret: 3, finger: 3 }),
+    ])
+    base.tracks[0].tuning = tuning
+    const s = load(toAlphaTex(base))
+    const staff = s.tracks[0].staves[0]
+    expect(staff.tuning.length).toBe(strings)
+    const beats = staff.bars[0].voices[0].beats
+    // alphaTab numbers strings from the lowest (1)
+    expect(beats[0].notes[0].string).toBe(1)
+    expect(soundingNotes(s).map((n) => n[1])).toEqual(strings === 7 ? [35, 38] : [30, 33])
+  })
+
   it('handles triplets', () => {
     const s = load(toAlphaTex(score([0, 320, 640].map((t) => note({ tick: t, durationTicks: 320, midi: 64, string: 1, fret: 0 })))))
     const beats = s.tracks[0].staves[0].bars[0].voices[0].beats

@@ -5,7 +5,8 @@ import { ScoreView } from './components/ScoreView'
 import { SettingsPanel, type TrackSettings } from './components/SettingsPanel'
 import { TimingPanel } from './components/TimingPanel'
 import { Upload } from './components/Upload'
-import { getScore, getTunings, isAudioFile, resolveTrack, setTiming, suggestCapo, uploadFile, watchJob, type ResolveRequest, type TimingRequest } from './lib/api'
+import { getScore, getTunings, isAudioFile, resolveTrack, setTiming, suggestCapo, suggestTuning, uploadFile, watchJob, type ResolveRequest, type TimingRequest } from './lib/api'
+import { tuningName } from './lib/tunings'
 import { isUncertain } from './lib/alphaTabScore'
 import type { AudioMode, CapoSuggestion, Job, TabiffyScore, TuningPreset } from './lib/types'
 
@@ -71,13 +72,13 @@ export default function App() {
     setScoreId(id)
   }
 
-  const onFile = async (file: File, mode: AudioMode) => {
+  const onFile = async (file: File, mode: AudioMode, tuning: string) => {
     setError(null)
     setBusy(true)
     setJob({ id: '', filename: file.name, status: 'queued', stage: 'upload', stageLabel: 'Uploading', progress: 0, error: null,
       options: { mode, kind: isAudioFile(file.name) ? 'audio' : 'midi' } })
     try {
-      const jobId = await uploadFile(file, mode)
+      const jobId = await uploadFile(file, mode, tuning)
       watchJob(jobId, (j) => {
         setJob(j)
         if (j.status === 'done') {
@@ -136,6 +137,16 @@ export default function App() {
     }
   }
 
+  const onSuggestTuning = async (strings?: number[]) => {
+    if (!scoreId || !track) return []
+    try {
+      return await suggestTuning(scoreId, track.id, strings)
+    } catch (e) {
+      setError((e as Error).message)
+      return []
+    }
+  }
+
   const onTiming = async (req: TimingRequest) => {
     if (!scoreId) return
     setBusy(true)
@@ -187,7 +198,7 @@ export default function App() {
 
       {error && <div className="error banner">{error}</div>}
 
-      {!scoreId && !job && <Upload onFile={onFile} busy={busy} />}
+      {!scoreId && !job && <Upload onFile={onFile} busy={busy} tunings={tunings} />}
       {job && (
         <div className="job">
           <p>Working on <strong>{job.filename}</strong></p>
@@ -208,6 +219,13 @@ export default function App() {
               ))}
             </div>
             {shown.audio?.warnings.map((w) => <div key={w} className="notice">{w}</div>)}
+            {track.tuningDetected && track.targetInstrument === 'guitar' && (
+              <div className="notice">
+                Tuning detected from the notes: <strong>{tuningName(tunings, track.tuning)}</strong> ({track.tuning.length} strings)
+                {(track.tuningSuggestions?.length ?? 0) > 1 && <>; also possible: {track.tuningSuggestions!.slice(1).map((t) => t.label.replace(/ \(.*\)$/, '')).join(', ')}</>}.
+                {' '}Change it under Track settings → Tuning.
+              </div>
+            )}
             {uncertain.length > 0 && (
               <div className="notice review">
                 <span>
@@ -253,6 +271,7 @@ export default function App() {
             suggestion={suggestion}
             onApply={onApply}
             onSuggestCapo={onSuggestCapo}
+            onSuggestTuning={onSuggestTuning}
           />
           <TimingPanel
             key={`${shown.meta.timeSignature.join('/')}|${shown.tempoMap[0]?.bpm}|${shown.audio?.tempoFactor}|${shown.audio?.downbeatShift}`}

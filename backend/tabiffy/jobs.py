@@ -68,15 +68,18 @@ def run_job(job_id: str) -> None:
     try:
         job = storage.read_job(job_id)
         path = storage.input_file(job_id)
+        tuning = job.get("options", {}).get("tuning", "auto")
         if file_kind(job["filename"]) == "midi":
-            source, score = import_midi(path.read_bytes(), job["filename"], on_stage=on_stage)
+            source, score = import_midi(path.read_bytes(), job["filename"], on_stage=on_stage, tuning=tuning)
         else:
             from .audio.decode import AudioError
             from .audio.pipeline import import_audio
 
             mode = job.get("options", {}).get("mode", "guitar")
             try:
-                source, score = import_audio(path, storage.stages_dir(job_id), job["filename"], mode, on_stage=on_stage)
+                source, score = import_audio(
+                    path, storage.stages_dir(job_id), job["filename"], mode, on_stage=on_stage, tuning=tuning
+                )
             except AudioError as e:
                 raise UnsupportedFile(str(e)) from None
         storage.write_stage(job_id, "1b_source", source)

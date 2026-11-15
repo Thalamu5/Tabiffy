@@ -115,3 +115,29 @@ def test_bad_ids_are_404(client):
     assert client.get("/api/scores/..%2F..%2Fetc").status_code == 404
     assert client.get("/api/does-not-exist").status_code == 404
     assert client.get("/api/jobs/nothex").status_code == 404
+
+
+def test_tuning_detection_and_suggestions(client, fixtures_dir):
+    path = fixtures_dir / "chord_progression.mid"
+    r = client.post("/api/jobs", files={"file": (path.name, path.read_bytes())}, data={"tuning": "drop-c"})
+    job_id = r.json()["jobId"]
+    for _ in range(100):
+        if client.get(f"/api/jobs/{job_id}").json()["status"] == "done":
+            break
+        time.sleep(0.05)
+    t = client.get(f"/api/scores/{job_id}").json()["tracks"][0]
+    assert t["tuning"][0] == "C2" and not t.get("tuningDetected")
+
+    sid = upload(client, path)  # default: auto-detect
+    t = client.get(f"/api/scores/{sid}").json()["tracks"][0]
+    assert t["tuningDetected"] and t["tuningSuggestions"]
+    seven = client.post(f"/api/scores/{sid}/suggest-tuning", json={"trackId": t["id"], "strings": [7]}).json()
+    assert seven and all(s["strings"] == 7 for s in seven)
+    # choosing another tuning keeps the suggestions but it's no longer "detected"
+    r = client.post(f"/api/scores/{sid}/resolve", json={"trackId": t["id"], "tuning": seven[0]["tuning"]})
+    nt = r.json()["tracks"][0]
+    assert len(nt["tuning"]) == 7 and nt["tuningSuggestions"] and not nt["tuningDetected"]
+    assert (
+        client.post("/api/jobs", files={"file": (path.name, path.read_bytes())}, data={"tuning": "bass-4"}).status_code
+        == 422
+    )

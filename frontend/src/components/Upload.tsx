@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
-import type { AudioMode } from '../lib/types'
+import { GUITAR_STRING_COUNTS, presetsFor } from '../lib/tunings'
+import type { AudioMode, TuningPreset } from '../lib/types'
 
 interface Props {
-  onFile: (file: File, mode: AudioMode) => void
+  onFile: (file: File, mode: AudioMode, tuning: string) => void
   busy: boolean
+  tunings: Record<string, TuningPreset>
 }
 
 const SAMPLES = [
@@ -23,15 +25,16 @@ const MODES: { value: AudioMode; label: string; hint: string }[] = [
   { value: 'mix', label: 'A full band mix', hint: 'everything together; rough results' },
 ]
 
-export function Upload({ onFile, busy }: Props) {
+export function Upload({ onFile, busy, tunings }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
   const [mode, setMode] = useState<AudioMode>('guitar')
+  const [tuning, setTuning] = useState('auto')
 
   const loadSample = async (name: string, sampleMode?: AudioMode) => {
     const res = await fetch(`/samples/${name}`)
     const blob = await res.blob()
-    onFile(new File([blob], name, { type: blob.type }), sampleMode ?? mode)
+    onFile(new File([blob], name, { type: blob.type }), sampleMode ?? mode, tuning)
   }
 
   return (
@@ -44,7 +47,7 @@ export function Upload({ onFile, busy }: Props) {
           e.preventDefault()
           setOver(false)
           const f = e.dataTransfer.files[0]
-          if (f) onFile(f, mode)
+          if (f) onFile(f, mode, tuning)
         }}
         onClick={() => input.current?.click()}
         role="button"
@@ -55,7 +58,7 @@ export function Upload({ onFile, busy }: Props) {
         <p><strong>Drop a song here</strong> or click to choose a file</p>
         <p className="muted">Audio (.mp3, .wav, .flac, .ogg, .m4a, up to 15 minutes) or MIDI (.mid)</p>
         <input ref={input} type="file" accept=".mid,.midi,audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac,.opus" hidden disabled={busy}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f, mode); e.target.value = '' }} />
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f, mode, tuning); e.target.value = '' }} />
       </div>
 
       <fieldset className="modes">
@@ -70,6 +73,23 @@ export function Upload({ onFile, busy }: Props) {
           </label>
         ))}
       </fieldset>
+
+      <label className="tuning-choice">
+        Guitar tuning
+        <select value={tuning} onChange={(e) => setTuning(e.target.value)}>
+          <option value="auto">Detect it from the notes (recommended)</option>
+          {GUITAR_STRING_COUNTS.map((n) => (
+            <optgroup key={n} label={`${n}-string`}>
+              {presetsFor(tunings, 'guitar', n).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <small className="muted">
+          {tuning === 'auto'
+            ? 'Tabiffy suggests a tuning (6, 7 or 8 strings) from what it hears; detection works best on a guitar-only recording. You can change it afterwards.'
+            : 'The tab will be written for this tuning.'}
+        </small>
+      </label>
 
       <p className="hint">
         Each audio file becomes one part. For the best tab from a full song, separate the instrument you want first

@@ -178,9 +178,16 @@ def solve_all(
     settings: SolverSettings | None = None,
     previous: TabiffyScore | None = None,
     on_progress=None,
+    tuning: str = "standard",
 ) -> TabiffyScore:
     """Build every output track from `source`. With `previous`, each track keeps the
-    target/tuning/capo/transpose the user chose (matched by source track index)."""
+    target/tuning/capo/transpose the user chose (matched by source track index).
+
+    `tuning` applies to new guitar tracks: a preset key from tunings.TUNINGS, or "auto" to
+    pick the best-fitting tuning from the notes (alternatives are stored on the track)."""
+    from .tuning_suggest import suggest_tunings
+    from .tunings import TUNINGS
+
     out = source.model_copy(deep=True)
     out.settings = settings or (previous.settings if previous else SolverSettings())
     out.tracks = []
@@ -201,15 +208,27 @@ def solve_all(
         else:
             opts = ResolveOptions(target=src.target_instrument, settings=out.settings)
             track_id, name = f"t{i + 1}", src.name
+        suggestions, detected = [], False
+        if not prev and src.target_instrument == "guitar":
+            if tuning == "auto":
+                suggestions = suggest_tunings(source, src, out.settings)
+                if suggestions:
+                    opts.tuning, detected = suggestions[0].tuning, True
+            elif TUNINGS.get(tuning, {}).get("instrument") == "guitar":
+                opts.tuning = TUNINGS[tuning]["notes"]
         track, _ = build_track(source, src, opts, track_id)
         track.name = name
+        if prev:
+            track.tuning_suggestions, track.tuning_detected = prev.tuning_suggestions, prev.tuning_detected
+        else:
+            track.tuning_suggestions, track.tuning_detected = suggestions, detected
         out.tracks.append(track)
     relabel_chords(out, source)
     return out
 
 
 def import_midi(
-    data: bytes, filename: str, settings: SolverSettings | None = None, on_stage=None
+    data: bytes, filename: str, settings: SolverSettings | None = None, on_stage=None, tuning: str = "auto"
 ) -> tuple[TabiffyScore, TabiffyScore]:
     """Returns (source score with raw notes, solved output score)."""
 
@@ -223,7 +242,7 @@ def import_midi(
     if not source.meta.key:
         source.meta.key = detect_key([n for t in source.tracks for n in t.notes])
     stage("solve", 0.5)
-    out = solve_all(source, settings, on_progress=lambda f: stage("solve", 0.5 + 0.45 * f))
+    out = solve_all(source, settings, on_progress=lambda f: stage("solve", 0.5 + 0.45 * f), tuning=tuning)
     return source, out
 
 

@@ -1,4 +1,4 @@
-import type { AudioMode, CapoSuggestion, Job, SolverSettings, TabiffyScore, TargetInstrument, TuningPreset } from './types'
+import type { AudioMode, CapoSuggestion, Job, SolverSettings, TabiffyScore, TargetInstrument, TuningPreset, TuningSuggestion } from './types'
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -14,10 +14,12 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function uploadFile(file: File, mode: AudioMode = 'guitar'): Promise<string> {
+/** `tuning`: 'auto' to detect it from the notes, or a guitar preset key from /api/tunings. */
+export async function uploadFile(file: File, mode: AudioMode = 'guitar', tuning = 'auto'): Promise<string> {
   const form = new FormData()
   form.append('file', file)
   form.append('mode', mode)
+  form.append('tuning', tuning)
   const { jobId } = await json<{ jobId: string }>(await fetch('/api/jobs', { method: 'POST', body: form }))
   return jobId
 }
@@ -96,6 +98,14 @@ export async function suggestCapo(id: string, req: ResolveRequest): Promise<Capo
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
+  }))
+}
+
+export async function suggestTuning(id: string, trackId: string, strings?: number[]): Promise<TuningSuggestion[]> {
+  return json(await fetch(`/api/scores/${id}/suggest-tuning`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trackId, strings }),
   }))
 }
 

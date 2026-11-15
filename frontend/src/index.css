@@ -160,3 +160,12 @@ main { min-width: 0; }
   .topbar, .settings, .player-bar, .visualizer, .tracks, .notice, .mixer { display: none !important; }
   .at-viewport { height: auto; overflow: visible; }
 }
+
+.tuning-choice { max-width: 100%; margin-top: 16px; }
+.tuning-choice small { font-size: 12px; }
+.suggestions { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.suggestions li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.suggestions li.active { border-color: var(--accent); }
+.suggestions li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.suggestions small { font-size: 11px; }
+.suggestions li > button, .suggestions li > .pill { white-space: nowrap; flex-shrink: 0; }

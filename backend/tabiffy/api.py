@@ -16,8 +16,9 @@ from pydantic import Field
 
 from . import __version__, jobs, storage
 from .midi_export import score_to_midi
-from .models import CapoSuggestion, SolverSettings, TabiffyScore, TargetInstrument, _Model
+from .models import CapoSuggestion, SolverSettings, TabiffyScore, TargetInstrument, TuningSuggestion, _Model
 from .pipeline import ResolveOptions, build_track, relabel_chords, solve_all, suggest_capo
+from .tuning_suggest import suggest_tunings
 from .tunings import TUNINGS
 
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024
@@ -92,7 +93,7 @@ def tunings() -> dict:
 
 
 @app.post("/api/jobs")
-async def create_job(file: UploadFile = File(...), mode: str = Form("guitar")) -> dict:
+async def create_job(file: UploadFile = File(...), mode: str = Form("guitar"), tuning: str = Form("auto")) -> dict:
     """Upload a MIDI or audio file. `mode` (audio only) says what the recording contains:
     "guitar" | "bass" | "piano" | "vocals" | "other", or "mix" for a whole band mix (rough results)."""
     filename = file.filename or "upload"
@@ -102,7 +103,9 @@ async def create_job(file: UploadFile = File(...), mode: str = Form("guitar")) -
         raise HTTPException(415, str(e)) from None
     if mode not in jobs.AUDIO_MODES:
         raise HTTPException(422, f"mode must be one of {sorted(jobs.AUDIO_MODES)}")
-    job_id = storage.new_job(filename, options={"mode": mode, "kind": kind})
+    if tuning != "auto" and TUNINGS.get(tuning, {}).get("instrument") != "guitar":
+        raise HTTPException(422, "tuning must be 'auto' or a guitar tuning key from /api/tunings")
+    job_id = storage.new_job(filename, options={"mode": mode, "kind": kind, "tuning": tuning})
     size = 0
     with storage.input_path(job_id, filename).open("wb") as out:
         while chunk := await file.read(CHUNK):
@@ -166,7 +169,11 @@ def resolve(score_id: str, req: ResolveRequest) -> Response:
     if req.settings:
         score.settings = req.settings
     new_track, _ = build_track(source, src_track, opts, req.track_id)
-    new_track.name = score.tracks[idx].name
+    old = score.tracks[idx]
+    new_track.name = old.name
+    # keep the tuning suggestions; the tuning is now the user's choice unless they kept the detected one
+    new_track.tuning_suggestions = old.tuning_suggestions
+    new_track.tuning_detected = old.tuning_detected and new_track.tuning == old.tuning
     score.tracks[idx] = new_track
     relabel_chords(score, source)
     storage.write_score(score_id, score)
@@ -230,6 +237,33 @@ def timing(score_id: str, req: TimingRequest) -> Response:
     storage.write_stage(score_id, "1b_source", source)
     storage.write_score(score_id, score)
     return Response(score.to_json(), media_type="application/json")
+
+
+class TuningRequest(_Model):
+    track_id: str
+    strings: list[int] | None = None  # limit to e.g. [7] for 7-string tunings
+
+
+@app.post("/api/scores/{score_id}/suggest-tuning")
+def tuning_suggestion(score_id: str, req: TuningRequest) -> list[TuningSuggestion]:
+    """Rank guitar tunings by how well the track's notes fit them."""
+    score = _score_or_404(score_id)
+    try:
+        source = storage.read_stage(score_id, "1b_source")
+    except KeyError:
+        raise HTTPException(409, "Source data for this score is missing") from None
+    idx = next((i for i, t in enumerate(score.tracks) if t.id == req.track_id), None)
+    if idx is None:
+        raise HTTPException(404, "Track not found")
+    track = score.tracks[idx]
+    src_idx = track.source_track_index if track.source_track_index is not None else idx
+    if not 0 <= src_idx < len(source.tracks):
+        raise HTTPException(409, "Source track is missing")
+    suggestions = suggest_tunings(source, source.tracks[src_idx], score.settings, set(req.strings or []) or None)
+    if not req.strings:
+        score.tracks[idx].tuning_suggestions = suggestions
+        storage.write_score(score_id, score)
+    return suggestions
 
 
 @app.get("/api/scores/{score_id}/export")

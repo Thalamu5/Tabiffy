@@ -35,6 +35,22 @@ export interface Track {
   notes: Note[]
   sourceTrackIndex?: number
   capoSuggestion?: CapoSuggestion
+  tuningSuggestions?: TuningSuggestion[]
+  /** the tuning was picked automatically from the notes heard */
+  tuningDetected?: boolean
+}
+
+export interface TuningSuggestion {
+  key: string
+  label: string
+  tuning: string[]
+  strings: number
+  /** lower = better fit */
+  score: number
+  /** score minus the best score */
+  relative: number
+  notesBelow: number
+  reason: string
 }
 
 export interface CapoSuggestion {
@@ -107,4 +123,6 @@ export interface TuningPreset {
   label: string
   instrument: 'guitar' | 'bass'
   notes: string[]
+  strings: number
+  family: 'standard' | 'drop' | 'open'
 }

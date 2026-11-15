@@ -73,6 +73,17 @@ class CapoSuggestion(_Model):
     cost: float = 0.0
 
 
+class TuningSuggestion(_Model):
+    key: str  # preset key in tunings.TUNINGS
+    label: str
+    tuning: list[str]
+    strings: int
+    score: float  # lower = better fit
+    relative: float = 0.0  # score minus the best score
+    notes_below: int = 0
+    reason: str = ""
+
+
 class Track(_Model):
     id: str
     name: str
@@ -86,6 +97,8 @@ class Track(_Model):
     # Index of the track in the source file this one was built from.
     source_track_index: int | None = None
     capo_suggestion: CapoSuggestion | None = None
+    tuning_suggestions: list[TuningSuggestion] = Field(default_factory=list)
+    tuning_detected: bool = False  # the tuning was picked automatically from the notes
 
 
 class SolverSettings(_Model):

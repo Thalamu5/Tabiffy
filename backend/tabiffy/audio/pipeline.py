@@ -134,12 +134,13 @@ def import_audio(
     mode: str = "guitar",
     settings: SolverSettings | None = None,
     on_stage: Stage = _noop,
+    tuning: str = "auto",
 ) -> tuple[TabiffyScore, TabiffyScore]:
     audio = transcribe_audio(input_path, work_dir, mode, on_stage)
     on_stage("solve", 0.95)
     title = Path(filename).stem.replace("_", " ")
     source = build_source(work_dir, audio, title, filename)
-    out = solve_all(source, settings)
+    out = solve_all(source, settings, tuning=tuning)
     cleanup(work_dir)
     return source, out
 
