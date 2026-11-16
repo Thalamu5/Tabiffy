@@ -92,3 +92,15 @@ def test_path_tricks_never_reach_files(client):
     for path in ["/api/scores/..%2F..%2Fetc%2Fpasswd", "/api/jobs/../../etc/passwd", "/..%2F..%2Fetc%2Fpasswd"]:
         r = client.get(path)
         assert "root:" not in r.text and r.status_code in (200, 404)  # 200 = the app's own page
+
+
+def test_unwritable_data_folder_gives_a_clear_message(client, monkeypatch, fixtures_dir):
+    from tabiffy import storage
+
+    def denied(*a, **k):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(storage, "new_job", denied)
+    path = fixtures_dir / "pentatonic_riff.mid"
+    r = client.post("/api/jobs", files={"file": (path.name, path.read_bytes(), "audio/midi")})
+    assert r.status_code == 503 and "data folder" in r.json()["detail"]

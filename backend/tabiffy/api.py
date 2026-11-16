@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import time
@@ -30,6 +31,11 @@ from .pipeline import ResolveOptions, build_track, relabel_chords, solve_all, su
 from .tuning_suggest import suggest_tunings
 from .tunings import TUNINGS
 
+log = logging.getLogger(__name__)
+DATA_FOLDER_ERROR = (
+    "The server can't save uploads because it isn't allowed to write to its data folder. "
+    "If you use Docker, rebuild and restart it: docker compose up --build"
+)
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 MAX_JSON_BYTES = 20 * 1024 * 1024  # scores and settings; far above a real song's size
 CHUNK = 1024 * 1024
@@ -132,7 +138,12 @@ async def create_job(
         raise HTTPException(422, f"mode must be one of {sorted(jobs.AUDIO_MODES)}")
     if tuning != "auto" and TUNINGS.get(tuning, {}).get("instrument") != "guitar":
         raise HTTPException(422, "tuning must be 'auto' or a guitar tuning key from /api/tunings")
-    job_id = storage.new_job(filename, options={"mode": mode, "kind": kind, "tuning": tuning, "tapping": tapping})
+    try:
+        job_id = storage.new_job(filename, options={"mode": mode, "kind": kind, "tuning": tuning, "tapping": tapping})
+    except PermissionError:
+        # Seen when the data folder belongs to another user (e.g. Docker data from an older version).
+        log.error("cannot write to the data folder: %s", storage.data_dir())
+        raise HTTPException(503, DATA_FOLDER_ERROR) from None
     size = 0
     with storage.input_path(job_id, filename).open("wb") as out:
         while chunk := await file.read(CHUNK):
