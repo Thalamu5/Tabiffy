@@ -14,7 +14,7 @@ first with a stem-separation tool of your choice and upload that part.
 
 | Feature | Status |
 |---|---|
-| Upload **audio** (mp3, wav, flac, ogg, m4a, up to 15 min) or **MIDI** | ✅ |
+| Upload **audio** (mp3, wav, flac, ogg, m4a, wma, up to 15 min) or **MIDI** | ✅ |
 | Say what's in the file (guitar, bass, piano, vocals, other, or a full band mix) to tune note detection | ✅ |
 | **Tuning detection:** suggests the best-fitting guitar tuning (6, 7 or 8 strings) with reasons and alternatives | ✅ |
 | Or pick the tuning at upload / any time, and the tab sticks to it | ✅ |

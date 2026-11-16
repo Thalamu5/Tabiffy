@@ -159,5 +159,5 @@ export async function getAudio(id: string): Promise<Uint8Array> {
 
 /** True for audio file names (anything else is treated as MIDI). */
 export function isAudioFile(name: string): boolean {
-  return /\.(mp3|wav|flac|ogg|m4a|aac|opus|aiff?)$/i.test(name)
+  return /\.(mp3|wav|flac|ogg|m4a|aac|opus|aiff?|wma)$/i.test(name)
 }

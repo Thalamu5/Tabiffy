@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tabiffy-job")
 
 MIDI_EXTS = {".mid", ".midi", ".smf"}
-AUDIO_EXTS = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".aiff", ".aif"}
+AUDIO_EXTS = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".aiff", ".aif", ".wma"}
 AUDIO_MODES = {"guitar", "bass", "piano", "vocals", "other", "mix"}
 JOB_TIMEOUT_SECONDS = 60 * 60
 
@@ -44,7 +44,8 @@ def file_kind(filename: str) -> str:
     if ext in AUDIO_EXTS:
         return "audio"
     raise UnsupportedFile(
-        f"Unsupported file type {ext or '(none)'}. Upload a MIDI file (.mid) or audio (.mp3, .wav, .flac, .ogg, .m4a)."
+        f"Unsupported file type {ext or '(none)'}. "
+        "Upload a MIDI file (.mid) or audio (.mp3, .wav, .flac, .ogg, .m4a, .wma)."
     )
 
 

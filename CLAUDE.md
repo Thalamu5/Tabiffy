@@ -12,7 +12,8 @@ the deliberate deviations from the spec.
   themselves before uploading; don't add it to the app. Keep heavy imports lazy so the MIDI path works without them.
   `transcribe.py` also drops octave "ghost" overtones and records legato clues per note (pick-attack strength from
   high-frequency onsets, glide-in from Basic Pitch's contour); `legato.py` turns them into slide/hammer/pull links
-  (`Note.legato_to`). `pipeline.align_beats` shifts the beat grid onto the note onsets.
+  (`Note.legato_to`). `pipeline.align_beats` shifts the beat grid onto the note onsets. Basic Pitch frequency limits
+  must stay inside A0-C8 (`BP_LOWEST_HZ`/`BP_HIGHEST_HZ`): outside it they wrap around and erase every note.
 - `frontend/` – React + TypeScript + Vite + alphaTab (`@coderline/alphatab` 1.9). `src/lib/toAlphaTex.ts` converts
   TabiffyScore → alphaTex.
 - `fixtures/` – self-made MIDI files (regenerate with `python scripts/make_fixtures.py`; copies live in

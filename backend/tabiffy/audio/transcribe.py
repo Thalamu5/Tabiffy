@@ -30,13 +30,15 @@ PROFILES: dict[str, tuple[float | None, float | None, float, float, float]] = {
     # down to ~40 Hz so drop tunings and 7/8-string low strings are heard (8-string F#1 = 46 Hz)
     "guitar": (40.0, 1400.0, 0.5, 0.3, 80.0),
     "bass": (28.0, 420.0, 0.45, 0.3, 90.0),
-    "piano": (26.0, 4200.0, 0.5, 0.3, 60.0),
+    "piano": (27.6, 4186.0, 0.5, 0.3, 60.0),  # the whole piano: A0 to C8
     "vocals": (80.0, 1100.0, 0.55, 0.35, 120.0),
     "other": (60.0, 2100.0, 0.55, 0.35, 90.0),
     # a whole band mix: wide range and more sensitive, since instruments mask each other
-    "mix": (28.0, 4200.0, 0.4, 0.25, 80.0),
+    "mix": (28.0, 4186.0, 0.4, 0.25, 80.0),
 }
 MONOPHONIC = {"vocals", "bass"}
+BP_LOWEST_HZ = 27.6  # just above A0 (27.5 Hz), Basic Pitch's lowest note
+BP_HIGHEST_HZ = 4186.0  # C8, its highest
 SILENCE_RMS = 0.005  # recordings quieter than this are treated as empty
 
 _model = None
@@ -122,6 +124,10 @@ def transcribe(wav_path: Path, instrument: str) -> list[RawNote]:
     from basic_pitch.inference import predict
 
     lo, hi, onset, frame, min_ms = PROFILES.get(instrument, PROFILES["other"])
+    # Basic Pitch turns these limits into positions in its A0-C8 note list; a limit outside that range
+    # wraps around (e.g. below A0 becomes "the last note") and silently erases almost every note.
+    lo = min(max(lo or BP_LOWEST_HZ, BP_LOWEST_HZ), BP_HIGHEST_HZ)
+    hi = max(min(hi or BP_HIGHEST_HZ, BP_HIGHEST_HZ), lo)
     output, _, events = predict(
         str(wav_path),
         _load_model(),

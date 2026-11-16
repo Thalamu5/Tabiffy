@@ -147,6 +147,33 @@ def test_bass_part_goes_to_bass(tmp_path, recording):
     assert len(score.tracks[0].tuning) == 4
 
 
+@pytest.mark.parametrize("mode", ["guitar", "bass", "piano", "vocals", "other", "mix"])
+def test_every_instrument_setting_hears_notes(recording, mode):
+    # A frequency limit outside Basic Pitch's A0-C8 range once erased every note in piano mode.
+    from tabiffy.audio.transcribe import BP_HIGHEST_HZ, BP_LOWEST_HZ, PROFILES
+
+    lo, hi, *_ = PROFILES[mode]
+    assert BP_LOWEST_HZ <= lo < hi <= BP_HIGHEST_HZ
+    stem = recording["stems"]["bass" if mode == "bass" else "guitar"]
+    assert len(transcribe(stem, mode)) > 20
+
+
+def test_piano_recording_gives_notes(tmp_path, recording):
+    _, score = import_audio(recording["stems"]["guitar"], tmp_path / "work", "piano.wav", "piano")
+    assert not score.audio.warnings
+    assert score.tracks and len(score.tracks[0].notes) > 20
+
+
+def test_wma_files_are_accepted(tmp_path, recording):
+    import subprocess
+
+    from tabiffy.audio.decode import decode
+
+    wma = tmp_path / "song.wma"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(recording["mix"]), "-c:a", "wmav2", str(wma)], check=True)
+    assert decode(wma, tmp_path / "out.wav") == pytest.approx(20.2, abs=1.0)
+
+
 def test_rejects_non_audio(tmp_path):
     from tabiffy.audio.decode import AudioError, decode
 
@@ -164,9 +191,12 @@ def test_audio_upload_through_the_api(tmp_path, monkeypatch, recording):
     from tabiffy.api import app
 
     client = TestClient(app)
-    r = client.post(
-        "/api/jobs", files={"file": ("song.wav", recording["mix"].read_bytes(), "audio/wav")}, data={"mode": "mix"}
-    )
+    # Uploaded as .wma (Windows Media Audio), which goes through ffmpeg's ASF reader.
+    import subprocess
+
+    wma = tmp_path / "song.wma"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(recording["mix"]), "-c:a", "wmav2", str(wma)], check=True)
+    r = client.post("/api/jobs", files={"file": ("song.wma", wma.read_bytes(), "audio/x-ms-wma")}, data={"mode": "mix"})
     assert r.status_code == 200, r.text
     job_id = r.json()["jobId"]
     for _ in range(600):

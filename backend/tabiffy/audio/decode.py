@@ -19,7 +19,7 @@ SAFE_INPUT = [
     "-protocol_whitelist",
     "file",
     "-format_whitelist",
-    "mp3,wav,flac,ogg,aac,aiff,caf,w64,wv,matroska,webm,mov,mp4,m4a,3gp,3g2,mj2",
+    "mp3,wav,flac,ogg,aac,aiff,caf,w64,wv,matroska,webm,mov,mp4,m4a,3gp,3g2,mj2,asf",  # asf = .wma
 ]
 
 

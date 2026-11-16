@@ -60,8 +60,8 @@ export function Upload({ onFile, busy, tunings }: Props) {
       >
         <div className="drop-icon">♫</div>
         <p><strong>Drop a song here</strong> or click to choose a file</p>
-        <p className="muted">Audio (.mp3, .wav, .flac, .ogg, .m4a, up to 15 minutes) or MIDI (.mid)</p>
-        <input ref={input} type="file" accept=".mid,.midi,audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac,.opus" hidden disabled={busy}
+        <p className="muted">Audio (.mp3, .wav, .flac, .ogg, .m4a, .wma, up to 15 minutes) or MIDI (.mid)</p>
+        <input ref={input} type="file" accept=".mid,.midi,audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac,.opus,.wma" hidden disabled={busy}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f, opts()); e.target.value = '' }} />
       </div>
 
