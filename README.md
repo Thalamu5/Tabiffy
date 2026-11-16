@@ -63,6 +63,8 @@ docker compose up --build
 Open <http://localhost:8000>. The first build takes a few minutes; later starts are quick. This runs three
 services: the web app, a background worker that processes uploads, and Redis (the queue between them).
 By default it is only reachable from your own computer (see the comment in `docker-compose.yml` to change that).
+If uploads fail with a permission error after updating from an older version, run
+`docker compose run --rm --user root app chown -R tabiffy /data` once.
 
 ### Option B: for development
 
