@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from . import storage
+from .models import SolverSettings
 from .pipeline import import_midi
 
 log = logging.getLogger(__name__)
@@ -68,17 +69,19 @@ def run_job(job_id: str) -> None:
     try:
         job = storage.read_job(job_id)
         path = storage.input_file(job_id)
-        tuning = job.get("options", {}).get("tuning", "auto")
+        options = job.get("options", {})
+        tuning = options.get("tuning", "auto")
+        settings = SolverSettings(tapping=bool(options.get("tapping", False)))
         if file_kind(job["filename"]) == "midi":
-            source, score = import_midi(path.read_bytes(), job["filename"], on_stage=on_stage, tuning=tuning)
+            source, score = import_midi(path.read_bytes(), job["filename"], settings, on_stage=on_stage, tuning=tuning)
         else:
             from .audio.decode import AudioError
             from .audio.pipeline import import_audio
 
-            mode = job.get("options", {}).get("mode", "guitar")
+            mode = options.get("mode", "guitar")
             try:
                 source, score = import_audio(
-                    path, storage.stages_dir(job_id), job["filename"], mode, on_stage=on_stage, tuning=tuning
+                    path, storage.stages_dir(job_id), job["filename"], mode, settings, on_stage=on_stage, tuning=tuning
                 )
             except AudioError as e:
                 raise UnsupportedFile(str(e)) from None

@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import { GUITAR_STRING_COUNTS, presetsFor } from '../lib/tunings'
+import type { UploadOptions } from '../lib/api'
 import type { AudioMode, TuningPreset } from '../lib/types'
 
 interface Props {
-  onFile: (file: File, mode: AudioMode, tuning: string) => void
+  onFile: (file: File, opts: UploadOptions) => void
   busy: boolean
   tunings: Record<string, TuningPreset>
 }
@@ -30,11 +31,13 @@ export function Upload({ onFile, busy, tunings }: Props) {
   const [over, setOver] = useState(false)
   const [mode, setMode] = useState<AudioMode>('guitar')
   const [tuning, setTuning] = useState('auto')
+  const [tapping, setTapping] = useState(false)
+  const opts = (m: AudioMode = mode): UploadOptions => ({ mode: m, tuning, tapping })
 
   const loadSample = async (name: string, sampleMode?: AudioMode) => {
     const res = await fetch(`/samples/${name}`)
     const blob = await res.blob()
-    onFile(new File([blob], name, { type: blob.type }), sampleMode ?? mode, tuning)
+    onFile(new File([blob], name, { type: blob.type }), opts(sampleMode))
   }
 
   return (
@@ -47,7 +50,7 @@ export function Upload({ onFile, busy, tunings }: Props) {
           e.preventDefault()
           setOver(false)
           const f = e.dataTransfer.files[0]
-          if (f) onFile(f, mode, tuning)
+          if (f) onFile(f, opts())
         }}
         onClick={() => input.current?.click()}
         role="button"
@@ -58,7 +61,7 @@ export function Upload({ onFile, busy, tunings }: Props) {
         <p><strong>Drop a song here</strong> or click to choose a file</p>
         <p className="muted">Audio (.mp3, .wav, .flac, .ogg, .m4a, up to 15 minutes) or MIDI (.mid)</p>
         <input ref={input} type="file" accept=".mid,.midi,audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac,.opus" hidden disabled={busy}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f, mode, tuning); e.target.value = '' }} />
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f, opts()); e.target.value = '' }} />
       </div>
 
       <fieldset className="modes">
@@ -89,6 +92,14 @@ export function Upload({ onFile, busy, tunings }: Props) {
             ? 'Tabiffy suggests a tuning (6, 7 or 8 strings) from what it hears; detection works best on a guitar-only recording. You can change it afterwards.'
             : 'The tab will be written for this tuning.'}
         </small>
+      </label>
+
+      <label className="inline tapping-choice">
+        <input type="checkbox" checked={tapping} onChange={(e) => setTapping(e.target.checked)} />
+        <span>
+          This song uses <strong>two-hand tapping</strong>
+          <small className="muted"> · lets the tab use tapped notes (marked “T”) for wide jumps on one string. Leave it off otherwise.</small>
+        </span>
       </label>
 
       <p className="hint">

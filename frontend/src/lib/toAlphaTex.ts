@@ -156,6 +156,8 @@ export function staffBars(notes: Note[], opt: StaffOptions): string[] {
       const { prefix, effects } = durationTex(p)
       const beatEffects = [...effects]
       if (pi === 0) {
+        // Tapped notes: alphaTex marks tapping per beat ("T" above the staff).
+        if (sounding.some((n) => n.tick === a && n.techniques.includes('tap'))) beatEffects.push('tt')
         const chord = opt.chords?.get(a)
         if (chord) beatEffects.push(`ch ${quote(chord)}`)
         const tempo = opt.tempos?.get(a)

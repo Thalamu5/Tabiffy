@@ -10,6 +10,7 @@ clean time slices; chord labels are computed on the quantized notes.
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass, field
 
 from .chords import label_chords
@@ -75,7 +76,34 @@ def prepare_notes(score: TabiffyScore, source: Track, opts: ResolveOptions) -> l
     notes = map_to_range(notes, lo, hi, opts.transpose, phrase_gap_ticks=_bar_ticks(score), comfort=comfort)
     # 8. quantize (locked notes keep their timing)
     free = quantize_notes([n for n in notes if not n.user_edited], tpq, s.quantize)
-    return sorted(free + [n for n in notes if n.user_edited], key=lambda n: (n.tick, n.midi))
+    out = sorted(free + [n for n in notes if n.user_edited], key=lambda n: (n.tick, n.midi))
+    return single_line(out, tpq) if s.tapping and target != "piano" else out
+
+
+def single_line(notes: list[Note], tpq: int) -> list[Note]:
+    """Tapping mode: a note that's still ringing when the next one starts is cut there, so tapped
+    runs read as one line instead of stacked chords. Notes starting together (real chords) are kept,
+    except a quieter octave double, which in tapping is almost always the string's overtone."""
+    together = tpq // 16  # notes this close are one chord
+    notes = sorted(notes, key=lambda n: n.tick)
+    ghosts: set[int] = set()
+    for i, n in enumerate(notes):
+        j = i + 1
+        while j < len(notes) and notes[j].tick - n.tick <= together:
+            m = notes[j]
+            if abs(m.midi - n.midi) == 12:
+                ghosts.add(id(n) if n.velocity < m.velocity else id(m))
+            j += 1
+    notes = [n for n in notes if id(n) not in ghosts]
+    starts = sorted({n.tick for n in notes})
+    out = []
+    for n in notes:
+        k = bisect_right(starts, n.tick + together)
+        nxt = starts[k] if k < len(starts) else None
+        if nxt is not None and n.tick + n.duration_ticks > nxt:
+            n = n.model_copy(update={"duration_ticks": nxt - n.tick})
+        out.append(n)
+    return out
 
 
 def build_track(score: TabiffyScore, source: Track, opts: ResolveOptions, track_id: str) -> tuple[Track, float]:
@@ -109,6 +137,7 @@ def build_track(score: TabiffyScore, source: Track, opts: ResolveOptions, track_
             seconds_at=tempo.seconds,
             tolerance_ticks=tol,
             max_notes_per_slice=4 if s.simplify_chords else None,
+            tapping=s.tapping,
         )
         out_notes, cost = res.notes, res.cost + 5.0 * len(res.dropped)
 

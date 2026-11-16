@@ -15,11 +15,21 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 /** `tuning`: 'auto' to detect it from the notes, or a guitar preset key from /api/tunings. */
-export async function uploadFile(file: File, mode: AudioMode = 'guitar', tuning = 'auto'): Promise<string> {
+/** What the user told us about an upload. */
+export interface UploadOptions {
+  mode: AudioMode
+  /** "auto" or a tuning preset key */
+  tuning: string
+  /** the song uses two-hand tapping */
+  tapping: boolean
+}
+
+export async function uploadFile(file: File, opts: UploadOptions): Promise<string> {
   const form = new FormData()
   form.append('file', file)
-  form.append('mode', mode)
-  form.append('tuning', tuning)
+  form.append('mode', opts.mode)
+  form.append('tuning', opts.tuning)
+  form.append('tapping', opts.tapping ? 'true' : 'false')
   const { jobId } = await json<{ jobId: string }>(await fetch('/api/jobs', { method: 'POST', body: form }))
   return jobId
 }

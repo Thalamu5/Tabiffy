@@ -6,10 +6,10 @@ import { ScoreView } from './components/ScoreView'
 import { SettingsPanel, type TrackSettings } from './components/SettingsPanel'
 import { TimingPanel } from './components/TimingPanel'
 import { Upload } from './components/Upload'
-import { getScore, getTunings, isAudioFile, resolveTrack, setTiming, suggestCapo, suggestTuning, uploadFile, watchJob, type ResolveRequest, type TimingRequest } from './lib/api'
+import { getScore, getTunings, isAudioFile, resolveTrack, setTiming, suggestCapo, suggestTuning, uploadFile, watchJob, type ResolveRequest, type TimingRequest, type UploadOptions } from './lib/api'
 import { tuningName } from './lib/tunings'
 import { isSuggestedTechnique, isUncertain } from './lib/alphaTabScore'
-import type { AudioMode, CapoSuggestion, Job, TabiffyScore, TuningPreset } from './lib/types'
+import type { CapoSuggestion, Job, TabiffyScore, TuningPreset } from './lib/types'
 
 const LOOKAHEAD_TICKS = 480
 
@@ -74,13 +74,13 @@ export default function App() {
     setScoreId(id)
   }
 
-  const onFile = async (file: File, mode: AudioMode, tuning: string) => {
+  const onFile = async (file: File, opts: UploadOptions) => {
     setError(null)
     setBusy(true)
     setJob({ id: '', filename: file.name, status: 'queued', stage: 'upload', stageLabel: 'Uploading', progress: 0, error: null,
-      options: { mode, kind: isAudioFile(file.name) ? 'audio' : 'midi' } })
+      options: { mode: opts.mode, kind: isAudioFile(file.name) ? 'audio' : 'midi' } })
     try {
-      const jobId = await uploadFile(file, mode, tuning)
+      const jobId = await uploadFile(file, opts)
       watchJob(jobId, (j) => {
         setJob(j)
         if (j.status === 'done') {

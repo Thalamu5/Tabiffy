@@ -77,6 +77,7 @@ def build_source(
     """Turn the stored notes (seconds) into a beat-aligned source score."""
     notes_by_stem: dict[str, list[dict]] = json.loads((work_dir / "3_notes.json").read_text())
     beats = BeatInfo.from_dict(json.loads((work_dir / "4_beats.json").read_text()))
+    beats = align_beats(beats, [RawNote(**d).start for raw in notes_by_stem.values() for d in raw])
     grid = BeatGrid(beats, audio.duration_seconds, TPQ, audio.tempo_factor, audio.downbeat_shift, beats_per_bar)
 
     tracks: list[Track] = []
@@ -127,6 +128,38 @@ def build_source(
         ticks_per_quarter=TPQ,
         tracks=tracks,
         audio=audio,
+    )
+
+
+ALIGN_WINDOW = 0.07  # seconds: a note this close to a beat counts as played on that beat
+
+
+def align_beats(beats: BeatInfo, starts: list[float]) -> BeatInfo:
+    """Shift the beat times so they line up with the notes played on them. The beat tracker and the
+    note detector can disagree by a few hundredths of a second, which is enough to push fast notes
+    (like 16th-note triplets) onto the wrong grid line."""
+    import numpy as np
+
+    if not starts or not beats.beat_times:
+        return beats
+    s = np.sort(np.asarray(starts))
+    offsets = []
+    for b in beats.beat_times:
+        k = int(np.searchsorted(s, b))
+        near = [s[i] - b for i in (k - 1, k) if 0 <= i < len(s) and abs(s[i] - b) <= ALIGN_WINDOW]
+        if near:
+            offsets.append(min(near, key=abs))
+    # Only trust a shift that many beats agree on.
+    if len(offsets) < max(4, len(beats.beat_times) // 4):
+        return beats
+    shift = float(np.median(offsets))
+    if abs(shift) < 0.005:
+        return beats
+    return BeatInfo(
+        bpm=beats.bpm,
+        beat_times=[max(0.0, t + shift) for t in beats.beat_times],
+        beats_per_bar=beats.beats_per_bar,
+        downbeat_index=beats.downbeat_index,
     )
 
 

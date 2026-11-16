@@ -18,10 +18,10 @@ GRIDS = {
     "1/32": [8],
     "1/16+triplets": [4, 3, 6],
 }
-# Per-beat penalty (in quarter notes of timing error) for each triplet grid. The 6-per-beat grid is
-# finer, so it would fit loose straight playing by accident without a bigger penalty.
-TRIPLET_BIAS = {3: 0.12, 6: 0.25}
-GRID_SWITCH = 0.03  # cost of changing grid from one beat to the next (keeps the choice steady)
+# Timing error is measured in grid steps (0.5 = halfway between two grid lines). Per-beat penalty for
+# each triplet grid; the 6-per-beat grid is finer, so it gets a bigger one.
+TRIPLET_BIAS = {3: 0.3, 6: 0.6}
+GRID_SWITCH = 0.1  # cost of changing grid from one beat to the next (keeps the choice steady)
 
 
 def _snap(t: int, step: float) -> int:
@@ -40,10 +40,13 @@ def beat_grids(onsets: list[int], tpq: int, divisions: list[int]) -> dict[int, i
     beats = sorted(by_beat)
     if not beats:
         return {}
-    # cost[i, k]: timing error of beat i's onsets on grid k, plus that grid's penalty
+    # cost[i, k]: timing error (in grid steps) of beat i's onsets on grid k, plus that grid's penalty
     cost = np.array(
         [
-            [sum(abs(t - _snap(t, tpq / d)) for t in by_beat[b]) / tpq + TRIPLET_BIAS.get(d, 0.0) for d in divisions]
+            [
+                sum(abs(t - _snap(t, tpq / d)) for t in by_beat[b]) * d / tpq + TRIPLET_BIAS.get(d, 0.0)
+                for d in divisions
+            ]
             for b in beats
         ]
     )

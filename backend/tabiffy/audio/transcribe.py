@@ -75,6 +75,26 @@ def remove_drums(wav_path: Path, out_path: Path) -> Path:
     return out_path
 
 
+GHOST_RATIO = 0.5  # an octave-up note this much quieter than the note below is its overtone, not a note
+
+
+def drop_octave_ghosts(notes: list[RawNote]) -> list[RawNote]:
+    """Remove "ghost" notes: a quiet copy exactly one octave above a note starting at the same time.
+    A string's strong 2nd harmonic causes these; real octaves are played about equally loud."""
+    ghosts = set()
+    by_start = sorted(range(len(notes)), key=lambda i: notes[i].start)
+    for k, i in enumerate(by_start):
+        lo = notes[i]
+        for j in by_start[k + 1 :]:
+            hi = notes[j]
+            if hi.start - lo.start > 0.03:
+                break
+            for upper, lower, idx in ((hi, lo, j), (lo, hi, i)):
+                if upper.pitch - lower.pitch == 12 and upper.amplitude < GHOST_RATIO * lower.amplitude:
+                    ghosts.add(idx)
+    return [n for i, n in enumerate(notes) if i not in ghosts]
+
+
 def keep_one_line(notes: list[RawNote], prefer: str) -> list[RawNote]:
     """Make a line monophonic: where notes overlap, keep the top (melody) or bottom (bass) one."""
     notes = sorted(notes, key=lambda n: n.start)
@@ -106,7 +126,7 @@ def transcribe(wav_path: Path, instrument: str) -> list[RawNote]:
         maximum_frequency=hi,
         melodia_trick=True,
     )
-    notes = [RawNote(float(s), float(e), int(p), float(a)) for s, e, p, a, *_ in events if e > s]
+    notes = drop_octave_ghosts([RawNote(float(s), float(e), int(p), float(a)) for s, e, p, a, *_ in events if e > s])
     add_legato_clues(notes, wav_path, output)
     if instrument in MONOPHONIC:
         notes = keep_one_line(notes, "top" if instrument == "vocals" else "bottom")

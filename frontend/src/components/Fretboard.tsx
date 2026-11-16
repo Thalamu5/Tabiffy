@@ -53,10 +53,13 @@ export function Fretboard({ track, active, upcoming, leftHanded }: Props) {
     const x = n.fret === 0 && capo > 0 ? fretX(capo) + (leftHanded ? -10 : 10) : noteX(abs)
     const y = stringY(n.string)
     const isOpen = n.fret === 0
-    const label = isOpen ? '0' : n.finger !== undefined && n.finger !== 0 ? String(n.finger) : ''
+    // Tapped notes are played by the picking hand: shown as "T" on a different color, not a finger number.
+    const tapped = n.techniques.includes('tap')
+    const label = isOpen ? '0' : tapped ? 'T' : n.finger !== undefined && n.finger !== 0 ? String(n.finger) : ''
+    const cls = isOpen ? 'fb-open' : isUncertain(n) ? 'fb-note fb-warn' : tapped ? 'fb-note fb-tap' : 'fb-note'
     return (
       <g key={`${ghost ? 'g' : 'a'}-${n.id}`} opacity={ghost ? 0.35 : 1}>
-        <circle cx={x} cy={y} r={9} className={isOpen ? 'fb-open' : isUncertain(n) ? 'fb-note fb-warn' : 'fb-note'} />
+        <circle cx={x} cy={y} r={9} className={cls} />
         {!ghost && <text x={x} y={y + 4} className="fb-finger">{label}</text>}
       </g>
     )

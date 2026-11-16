@@ -22,5 +22,9 @@
   "openStringBonusSingleNote": 0.2,
   "openFarFromNut": 0.12,
   "melodicCrossing": 0.8,
-  "legatoStringChange": 3.0
+  "legatoStringChange": 3.0,
+  "tap": 3.0,
+  "tapMinFret": 5,
+  "tapStringChange": 0.8,
+  "tapReach": 5
 }

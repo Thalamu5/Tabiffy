@@ -171,6 +171,10 @@ export function SettingsPanel({ track, settings, tunings, busy, suggestion, onAp
             <input type="checkbox" checked={s.simplifyChords} onChange={(e) => setS({ ...s, simplifyChords: e.target.checked })} />
             Simplify chords (max 4 notes)
           </label>
+          <label className="inline" title="Lets the tab use tapped notes (marked T) for wide jumps on one string">
+            <input type="checkbox" checked={!!s.tapping} onChange={(e) => setS({ ...s, tapping: e.target.checked })} />
+            Two-hand tapping
+          </label>
         </>
       )}
       <label>

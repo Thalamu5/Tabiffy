@@ -116,6 +116,7 @@ main { min-width: 0; }
 .fb-fretnum { fill: var(--muted); font-size: 10px; text-anchor: middle; }
 .fb-note { fill: var(--accent); stroke: #fff; stroke-width: 1.5; }
 .fb-warn { fill: var(--warn); }
+.fb-tap { fill: var(--right); }
 .fb-open { fill: var(--surface); stroke: var(--accent); stroke-width: 2.5; }
 .fb-open + .fb-finger { fill: var(--accent); }
 .fb-finger { fill: #fff; font-size: 12px; font-weight: 700; text-anchor: middle; pointer-events: none; }
@@ -162,6 +163,7 @@ main { min-width: 0; }
   .at-viewport { height: auto; overflow: visible; }
 }
 
+label.tapping-choice { margin: 12px 0; align-items: flex-start; white-space: normal; max-width: 100%; }
 .tuning-choice { max-width: 100%; margin-top: 16px; }
 .tuning-choice small { font-size: 12px; }
 .suggestions { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }

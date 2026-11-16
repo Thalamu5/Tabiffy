@@ -123,6 +123,17 @@ describe('toAlphaTex', () => {
     expect(soundingNotes(s).map(([t]) => t)).toEqual([0, 160, 320, 480, 640, 800])
   })
 
+  it('marks tapped notes with T', () => {
+    const notes = [
+      note({ tick: 0, durationTicks: 160, midi: 80, string: 1, fret: 16, techniques: ['tap', 'pull'], legatoTo: 'p' }),
+      { ...note({ tick: 160, durationTicks: 160, midi: 65, string: 1, fret: 1, finger: 1 }), id: 'p' },
+    ]
+    const beats = load(toAlphaTex(score(notes))).tracks[0].staves[0].bars[0].voices[0].beats
+    expect(beats[0].tap).toBe(true)
+    expect(beats[0].notes[0].isHammerPullOrigin).toBe(true)
+    expect(beats[1].tap).toBe(false)
+  })
+
   it('draws high-neck arpeggios as a chord box that starts at the right fret', () => {
     // F#m arpeggio around the 11th fret: notes arrive one at a time, never at the chord's first tick together.
     const arp = [

@@ -32,6 +32,10 @@ class SolverConfig:
     cutRingingNote: float = 1.5  # noqa: N815
     positionBehindIndex: float = 0.15  # noqa: N815
     legatoStringChange: float = 3.0  # noqa: N815 (slide/hammer/pull pair split over two strings)
+    tap: float = 3.0  # tapping mode: cost of tapping a note instead of fretting it
+    tapReach: int = 5  # noqa: N815 (a tapped fret is at least this far above the fretting hand)
+    tapMinFret: int = 5  # noqa: N815 (lowest fret worth tapping)
+    tapStringChange: float = 0.8  # noqa: N815 (tapping mode: single-note line moves to another string)
     maxVoicingsPerSlice: int = 24  # noqa: N815
     maxFingersSpanFrets: int = 5  # noqa: N815
 

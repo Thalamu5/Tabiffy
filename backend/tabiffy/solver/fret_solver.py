@@ -42,6 +42,7 @@ class Voicing:
     min_fret: int | None
     max_fret: int | None
     string_mask: int
+    tapped: bool = False  # a single note played by the picking hand (two-hand tapping)
 
 
 @dataclass
@@ -96,8 +97,10 @@ class FretSolver:
         cfg: SolverConfig,
         open_pref: float = 1.0,
         standard_tuning: bool = False,
+        tapping: bool = False,
     ):
         # strings numbered 1 = highest; open_midi is low -> high
+        self.tapping = tapping
         self.n_strings = len(open_midi)
         self.open = {self.n_strings - i: m + capo for i, m in enumerate(open_midi)}
         self.max_fret = max_fret
@@ -194,13 +197,27 @@ class FretSolver:
             )
         sl.notes = notes  # keep note order in sync with voicing positions
         out.sort(key=lambda v: v.cost)
-        return out[: self.cfg.maxVoicingsPerSlice]
+        out = out[: self.cfg.maxVoicingsPerSlice]
+        # Tapping: a lone note may be tapped by the picking hand, which leaves the fretting hand where it is.
+        if self.tapping and len(notes) == 1 and not notes[0].user_edited:
+            for s, f in options[0]:
+                if f >= self.cfg.tapMinFret:
+                    cost = self.cfg.tap + self.cfg.highFretAbove12 * max(0, f - 12) / 2
+                    out.append(Voicing([(s, f)], cost, None, None, 1 << s, tapped=True))
+        return out
 
     # ---- DP ---------------------------------------------------------------
     def states(self, vs: list[Voicing]) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Returns (voicing index, hand position, intrinsic cost, is_free) per state."""
         vi, pos, cost, free = [], [], [], []
         for i, v in enumerate(vs):
+            if v.tapped:
+                # The fretting hand stays put (any position), and the tapped fret must be out of its reach.
+                tap_fret = v.positions[0][1]
+                for p in range(1, min(self.max_fret, FREE_POSITIONS) + 1):
+                    if tap_fret >= p + self.cfg.tapReach:
+                        vi.append(i), pos.append(p), cost.append(v.cost), free.append(True)
+                continue
             if v.min_fret is None:
                 for p in range(1, min(self.max_fret, FREE_POSITIONS) + 1):
                     c = v.cost + self.cfg.openFarFromNut * max(0, p - 4)
@@ -263,6 +280,9 @@ class FretSolver:
             c_str = np.array([v.positions[0][0] for v in cur_vs])[c_vi]
             ds = c_str[None, :] - p_str[:, None]  # +1 = moved to a lower-pitched string
             t += cfg.melodicCrossing * (((dp > 0) & (ds > 0)) | ((dp < 0) & (ds < 0)))
+            if self.tapping:
+                # Tapped runs stay on one string (tap, pull-off, hammer-on), so changing string costs extra.
+                t += cfg.tapStringChange * (ds != 0)
         return t
 
     def solve(self, slices: list[Slice]) -> tuple[list[tuple[Voicing, int]], float, list[Note]]:
@@ -328,9 +348,10 @@ def solve_track(
     seconds_at=None,
     tolerance_ticks: int = 0,
     max_notes_per_slice: int | None = None,
+    tapping: bool = False,
 ) -> SolveResult:
     """Assign string/fret/finger to every note. Returns new Note objects."""
-    solver = FretSolver(open_midi, capo, max_fret, cfg, open_pref, standard_tuning)
+    solver = FretSolver(open_midi, capo, max_fret, cfg, open_pref, standard_tuning, tapping)
     work = [n.model_copy(deep=True) for n in notes]
     slices = make_slices(work, tolerance_ticks)
     pre_dropped: list[Note] = []
@@ -351,7 +372,11 @@ def solve_track(
         fr = assign_fingers(v.positions, pos)
         for i, (n, (s, f)) in enumerate(zip(sl.notes, v.positions, strict=True)):
             n.string, n.fret = s, f
-            if not n.user_edited or n.finger is None:
+            n.techniques = [t for t in n.techniques if t != "tap"]
+            if v.tapped:
+                n.techniques.append("tap")
+                n.finger = None  # played by the picking hand, so no fretting-hand finger
+            elif not n.user_edited or n.finger is None:
                 n.finger = fr.fingers[i]
             flags = [x for x in n.flags if x not in ("barre", "stretch", "hardFingering")]
             if fr.barre and fr.fingers[i] == 1 and f > 0:
@@ -382,6 +407,10 @@ def check_legato(notes: list[Note]) -> None:
             n.techniques = [t for t in n.techniques if t not in LEGATO]
             n.legato_to = None
             n.flags = [f for f in n.flags if f != "suggestedTechnique"]
-        elif "slide" not in n.techniques:
-            kind = "hammer" if nxt.fret > n.fret else "pull"
-            n.techniques = [kind] + [t for t in n.techniques if t not in LEGATO]
+        else:
+            if "slide" not in n.techniques:
+                kind = "hammer" if nxt.fret > n.fret else "pull"
+                n.techniques = [kind] + [t for t in n.techniques if t not in LEGATO]
+            if "tap" in n.techniques or "tap" in nxt.techniques:
+                # Tapping is built from hammer-ons and pull-offs, so here they're expected, not a guess.
+                n.flags = [f for f in n.flags if f != "suggestedTechnique"]

@@ -20,7 +20,7 @@ SURE_ATTACK = 0.25  # below this we're confident there was no pick attack
 RELATIVE_ATTACK = 0.6  # ...or the second onset is this much weaker than the first
 GLIDE = 0.6  # semitones of smooth pitch movement into the second note that indicate a slide
 MAX_SLIDE_GAP = 0.15  # a slide's in-between pitches are often left out of both notes, leaving a gap
-MAX_INTERVAL = 12  # a slide can travel far; anything wider is treated as a new phrase
+MAX_INTERVAL = 24  # slides and tapping pull-offs travel far; anything wider is treated as a new phrase
 MAX_LEGATO_INTERVAL = 5  # widest normal hammer-on/pull-off (wider ones are suggestions only)
 
 

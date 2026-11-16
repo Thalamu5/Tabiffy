@@ -152,3 +152,20 @@ def test_tuning_detection_and_suggestions(client, fixtures_dir):
         client.post("/api/jobs", files={"file": (path.name, path.read_bytes())}, data={"tuning": "bass-4"}).status_code
         == 422
     )
+
+
+def test_tapping_option_is_saved_and_validated(client, fixtures_dir):
+    path = fixtures_dir / "pentatonic_riff.mid"
+    r = client.post("/api/jobs", files={"file": (path.name, path.read_bytes(), "audio/midi")}, data={"tapping": "true"})
+    assert r.status_code == 200
+    job_id = r.json()["jobId"]
+    for _ in range(100):
+        job = client.get(f"/api/jobs/{job_id}").json()
+        if job["status"] in ("done", "error"):
+            break
+        time.sleep(0.05)
+    assert client.get(f"/api/scores/{job_id}").json()["settings"]["tapping"] is True
+    bad = client.post(
+        "/api/jobs", files={"file": (path.name, path.read_bytes(), "audio/midi")}, data={"tapping": "maybe"}
+    )
+    assert bad.status_code == 422

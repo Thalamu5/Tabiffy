@@ -93,9 +93,12 @@ def tunings() -> dict:
 
 
 @app.post("/api/jobs")
-async def create_job(file: UploadFile = File(...), mode: str = Form("guitar"), tuning: str = Form("auto")) -> dict:
+async def create_job(
+    file: UploadFile = File(...), mode: str = Form("guitar"), tuning: str = Form("auto"), tapping: bool = Form(False)
+) -> dict:
     """Upload a MIDI or audio file. `mode` (audio only) says what the recording contains:
-    "guitar" | "bass" | "piano" | "vocals" | "other", or "mix" for a whole band mix (rough results)."""
+    "guitar" | "bass" | "piano" | "vocals" | "other", or "mix" for a whole band mix (rough results).
+    `tapping` says the song uses two-hand tapping, so the tab may use tapped notes."""
     filename = file.filename or "upload"
     try:
         kind = jobs.file_kind(filename)
@@ -105,7 +108,7 @@ async def create_job(file: UploadFile = File(...), mode: str = Form("guitar"), t
         raise HTTPException(422, f"mode must be one of {sorted(jobs.AUDIO_MODES)}")
     if tuning != "auto" and TUNINGS.get(tuning, {}).get("instrument") != "guitar":
         raise HTTPException(422, "tuning must be 'auto' or a guitar tuning key from /api/tunings")
-    job_id = storage.new_job(filename, options={"mode": mode, "kind": kind, "tuning": tuning})
+    job_id = storage.new_job(filename, options={"mode": mode, "kind": kind, "tuning": tuning, "tapping": tapping})
     size = 0
     with storage.input_path(job_id, filename).open("wb") as out:
         while chunk := await file.read(CHUNK):

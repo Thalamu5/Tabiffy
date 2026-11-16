@@ -110,6 +110,7 @@ class SolverSettings(_Model):
     open_string_preference: float = 1.0  # 0 = neutral, higher = more open strings
     simplify_chords: bool = False  # reduce voicings to at most 4 notes
     quantize: Literal["off", "1/8", "1/16", "1/16+triplets", "1/32"] = "1/16+triplets"
+    tapping: bool = False  # the song uses two-hand tapping: allow notes played by the picking hand
 
 
 class SyncPoint(_Model):

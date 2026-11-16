@@ -100,6 +100,8 @@ export interface SolverSettings {
   openStringPreference: number
   simplifyChords: boolean
   quantize: 'off' | '1/8' | '1/16' | '1/16+triplets' | '1/32'
+  /** two-hand tapping: allow notes played by the picking hand */
+  tapping?: boolean
 }
 
 /** What an audio upload contains. 'mix' = a whole band mix, transcribed as one part. */
