@@ -93,6 +93,18 @@ describe('toAlphaTex', () => {
     expect(staff.bars[0].voices[0].beats[0].chord?.name).toBe('D')
   })
 
+  it('writes 16th-note triplets (six per beat) as triplet groups', () => {
+    // Bar 1: one beat of 16th triplets (tapping-style 16-1-4 on one string), then a half-dotted rest.
+    const frets = [16, 1, 4, 16, 1, 4]
+    const notes = frets.map((f, i) => note({ tick: i * 160, durationTicks: 160, midi: 64 + f, string: 1, fret: f }))
+    const s = load(toAlphaTex(score(notes)))
+    const beats = s.tracks[0].staves[0].bars[0].voices[0].beats
+    const played = beats.filter((b) => b.notes.length)
+    expect(played.map((b) => b.notes[0].fret)).toEqual(frets)
+    expect(played.every((b) => b.duration === 16 && b.tupletNumerator === 3)).toBe(true)
+    expect(soundingNotes(s).map(([t]) => t)).toEqual([0, 160, 320, 480, 640, 800])
+  })
+
   it('draws high-neck arpeggios as a chord box that starts at the right fret', () => {
     // F#m arpeggio around the 11th fret: notes arrive one at a time, never at the chord's first tick together.
     const arp = [

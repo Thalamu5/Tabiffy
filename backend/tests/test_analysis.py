@@ -64,6 +64,22 @@ def test_quantize_triplets_only_where_they_fit():
     assert [n.tick for n in q] == [0, 320, 640, 960, 1200]
 
 
+def test_quantize_sixteenth_triplets():
+    # Six notes per beat, played a little loosely (as in fast tapping or legato runs).
+    jitter = [0, 12, -10, 8, -6, 14, 3, -12, 9, -4, 11, -8]
+    sext = make_notes([(i * 160 + j, 150, 60 + i % 3) for i, j in enumerate(jitter)])
+    q = quantize_notes(sext, TPQ, "1/16+triplets")
+    assert [n.tick for n in q] == [i * 160 for i in range(12)]
+
+
+def test_loose_straight_sixteenths_stay_straight():
+    # Straight 16ths with up to ~1/25 of a beat of timing slop must not turn into triplets.
+    jitter = [0, 30, -25, 35, 20, -30, 25, -35, 10, 38, -20, 28, -15, 33, -38, 18]
+    notes = make_notes([(i * 240 + j, 220, 64) for i, j in enumerate(jitter)])
+    q = quantize_notes(notes, TPQ, "1/16+triplets")
+    assert [n.tick for n in q] == [i * 240 for i in range(16)]
+
+
 def test_quantize_off_is_identity_and_merges_nothing():
     notes = make_notes([(7, 100, 60)])
     assert quantize_notes(notes, TPQ, "off")[0].tick == 7

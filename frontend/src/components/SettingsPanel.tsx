@@ -179,7 +179,7 @@ export function SettingsPanel({ track, settings, tunings, busy, suggestion, onAp
           <option value="off">Off (as played)</option>
           <option value="1/8">1/8 notes</option>
           <option value="1/16">1/16 notes</option>
-          <option value="1/16+triplets">1/16 + triplets</option>
+          <option value="1/16+triplets">1/16 + triplets (default)</option>
           <option value="1/32">1/32 notes</option>
         </select>
       </label>

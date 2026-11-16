@@ -1,9 +1,10 @@
 """Stage 8: snap onsets/durations to a rhythmic grid.
 
-The grid is chosen per quarter note: with triplets enabled, each beat uses either
-the straight 1/16 grid or the 1/8-triplet grid, whichever fits that beat's onsets
-best (straight wins ties). Keeping one grid per beat means the result can always be
-written with standard note values.
+The grid is chosen per quarter note: with triplets enabled, each beat uses the straight
+1/16 grid, the 1/8-triplet grid (3 per beat) or the 1/16-triplet grid (6 per beat),
+whichever fits that beat's onsets best. Triplet grids pay a small per-note penalty so
+slightly loose straight playing stays straight. One grid per beat keeps the result
+writable with standard note values.
 """
 
 from __future__ import annotations
@@ -14,9 +15,11 @@ GRIDS = {
     "1/8": [2],  # divisions per quarter note
     "1/16": [4],
     "1/32": [8],
-    "1/16+triplets": [4, 3],
+    "1/16+triplets": [4, 3, 6],
 }
-TRIPLET_BIAS = 0.02  # fraction of a quarter, per note, added to the triplet grid's error
+# Per-note penalty (fraction of a quarter) for each triplet grid. The 6-per-beat grid is finer, so it
+# would fit loose straight playing by accident without a bigger penalty.
+TRIPLET_BIAS = {3: 0.02, 6: 0.04}
 
 
 def _snap(t: int, step: float) -> int:
@@ -36,8 +39,7 @@ def beat_grids(onsets: list[int], tpq: int, divisions: list[int]) -> dict[int, i
         for i, div in enumerate(divisions):
             step = tpq / div
             err = sum(abs(t - _snap(t, step)) for t in ts) / tpq
-            if div % 3 == 0:
-                err += TRIPLET_BIAS * len(ts)
+            err += TRIPLET_BIAS.get(div, 0.0) * len(ts)
             if err < best_err - 1e-9 or (i == 0 and err <= best_err):
                 best, best_err = div, err
         chosen[b] = best
