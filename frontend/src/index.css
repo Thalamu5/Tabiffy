@@ -15,6 +15,8 @@
   --score-bg: #ffffff;
   color-scheme: light;
 }
+/* Dark colors: used when the device is dark and "Light" wasn't chosen, or when "Dark" was chosen.
+   CSS can't share one rule between a media query and a selector, so the values appear twice. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     --bg: #171614;
@@ -27,8 +29,23 @@
     --fret: #8b847a;
     --string: #d8d0c2;
     --warn: #ef5350;
+    --score-bg: #1b1a18;
     color-scheme: dark;
   }
+}
+:root[data-theme='dark'] {
+  --bg: #171614;
+  --surface: #211f1c;
+  --text: #efebe4;
+  --muted: #a39b90;
+  --border: #36322c;
+  --accent: #ee7448;
+  --wood: #3d2a1b;
+  --fret: #8b847a;
+  --string: #d8d0c2;
+  --warn: #ef5350;
+  --score-bg: #1b1a18;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -94,8 +111,8 @@ main { min-width: 0; }
 .mixer-track { display: inline-flex; align-items: center; gap: 4px; }
 .toggle { padding: 1px 7px; font-size: 12px; }
 .toggle.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-.at-viewport { height: 52vh; overflow-y: auto; background: var(--score-bg); color: #000; }
-/* alphaTab draws black-on-white music; keep it legible in dark mode */
+.at-viewport { height: 52vh; overflow-y: auto; background: var(--score-bg); color: var(--text); }
+/* Score colors themselves are set in ScoreView (alphaTab draws them, not CSS). */
 .at-viewport .at-cursor-bar { background: rgba(47, 111, 214, 0.08); }
 .at-viewport .at-cursor-beat { background: rgba(47, 111, 214, 0.85); width: 3px; }
 .at-viewport .at-highlight * { fill: #2f6fd6; stroke: #2f6fd6; }
@@ -201,3 +218,8 @@ label.tapping-choice { margin: 12px 0; align-items: flex-start; white-space: nor
 .scale-map .dot.tonic { fill: var(--accent); }
 .scale-map .dotname { font-size: 8px; text-anchor: middle; fill: var(--text); font-weight: 600; }
 .scale-map .dot.tonic + .dotname { fill: var(--accent-text); }
+
+/* Light / dark switch in the top bar */
+.theme-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.theme-switch button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 13px; background: transparent; }
+.theme-switch button.on { background: var(--accent); color: var(--accent-text); }

@@ -34,6 +34,7 @@ first with a stem-separation tool of your choice and upload that part.
 | Chord names + chord boxes (placed at the right fret), rhythm grid, capo/transpose, capo suggestions | ✅ |
 | Tab + notation, playback (speed, loop, metronome, count-in, mute/solo) | ✅ |
 | Animated **fretboard** and **piano** | ✅ |
+| **Dark mode**: Auto (follows your device) / Light / Dark switch in the top bar; PDFs always print light | ✅ |
 | Export **.gp** (Guitar Pro 7/8), **.mid**, **PDF** | ✅ |
 | Tab editor (click a note to fix it) | ⏳ M5 |
 | MuScriptor (a stronger transcription model) | ⏳ Later, once its weights license is checked |

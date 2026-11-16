@@ -8,6 +8,7 @@ import { TimingPanel } from './components/TimingPanel'
 import { Upload } from './components/Upload'
 import { getScore, getTunings, isAudioFile, resolveTrack, setTiming, suggestCapo, suggestTuning, uploadFile, watchJob, type ResolveRequest, type TimingRequest, type UploadOptions } from './lib/api'
 import { tuningName } from './lib/tunings'
+import { applyTheme, readTheme, useIsDark, type Theme } from './lib/theme'
 import { isSuggestedTechnique, isUncertain } from './lib/alphaTabScore'
 import type { CapoSuggestion, Job, TabiffyScore, TuningPreset } from './lib/types'
 
@@ -46,6 +47,12 @@ export default function App() {
   const [tunings, setTunings] = useState<Record<string, TuningPreset>>({})
   const [suggestion, setSuggestion] = useState<CapoSuggestion | null>(null)
   const [leftHanded, setLeftHanded] = useState(readPref('tabiffy.leftHanded'))
+  const [theme, setTheme] = useState<Theme>(readTheme)
+  const dark = useIsDark(theme)
+  const chooseTheme = (t: Theme) => {
+    setTheme(t)
+    applyTheme(t)
+  }
   const [seek, setSeek] = useState<{ tick: number; n: number } | null>(null)
   const [keyOpen, setKeyOpen] = useState(false) // the key/scale window
 
@@ -204,6 +211,14 @@ export default function App() {
           </div>
         )}
         <span className="spacer" />
+        <div className="theme-switch" role="group" aria-label="Color mode">
+          {(['auto', 'light', 'dark'] as const).map((t) => (
+            <button key={t} className={theme === t ? 'on' : ''} aria-pressed={theme === t} onClick={() => chooseTheme(t)}
+              title={t === 'auto' ? 'Follow this device’s setting' : `Always ${t}`}>
+              {t === 'auto' ? 'Auto' : t === 'light' ? '☀ Light' : '☾ Dark'}
+            </button>
+          ))}
+        </div>
         {shown && <button onClick={() => { window.history.pushState({}, '', '/'); setScoreId(null) }}>New upload</button>}
       </header>
 
@@ -260,7 +275,7 @@ export default function App() {
                 pull-offs are only suggested from the sound. They’re shown in blue: listen and keep the ones that feel right.
               </div>
             )}
-            <ScoreView score={shown} scoreId={scoreId!} trackIndex={trackIndex} onTick={onTick} seek={seek} />
+            <ScoreView score={shown} scoreId={scoreId!} trackIndex={trackIndex} onTick={onTick} seek={seek} dark={dark} />
             <section className="visualizer">
               <div className="viz-head">
                 <span>

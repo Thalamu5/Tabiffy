@@ -11,7 +11,13 @@ interface Props {
   onTick: (tick: number) => void
   /** Move the cursor here (the `n` counter lets the same tick be requested twice). */
   seek?: { tick: number; n: number } | null
+  /** Draw the music in light-on-dark colors. */
+  dark?: boolean
 }
+
+// alphaTab draws the music itself, so its colors are set here rather than in CSS. Print/PDF always uses LIGHT.
+const LIGHT = { staffLineColor: '#a5a5a5', barSeparatorColor: '#222222', barNumberColor: '#c80000', mainGlyphColor: '#000000', secondaryGlyphColor: '#00000066', scoreInfoColor: '#000000' }
+const DARK = { staffLineColor: '#6b665e', barSeparatorColor: '#cfc8bd', barNumberColor: '#ee7448', mainGlyphColor: '#efebe4', secondaryGlyphColor: '#efebe499', scoreInfoColor: '#efebe4' }
 
 /** Save bytes as a file through a temporary link. */
 function download(bytes: Uint8Array, filename: string, type: string) {
@@ -29,7 +35,7 @@ function safeName(s: string) {
 }
 
 /** alphaTab score view + player controls + exports. */
-export function ScoreView({ score, scoreId, trackIndex, onTick, seek }: Props) {
+export function ScoreView({ score, scoreId, trackIndex, onTick, seek, dark = false }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<alphaTab.AlphaTabApi | null>(null)
@@ -78,6 +84,18 @@ export function ScoreView({ score, scoreId, trackIndex, onTick, seek }: Props) {
       apiRef.current = null
     }
   }, [])
+
+  // Switch the music's colors when light/dark mode changes (re-draws only; playback is untouched).
+  useEffect(() => {
+    const api = apiRef.current
+    if (!api) return
+    const res = api.settings.display.resources
+    for (const [k, v] of Object.entries(dark ? DARK : LIGHT)) {
+      ;(res as unknown as Record<string, alphaTab.model.Color>)[k] = alphaTab.model.Color.fromJson(v)!
+    }
+    api.updateSettings()
+    if (api.score) api.render()
+  }, [dark])
 
   // Fetch the original recording the first time it's needed.
   useEffect(() => {
@@ -153,7 +171,7 @@ export function ScoreView({ score, scoreId, trackIndex, onTick, seek }: Props) {
     new alphaTab.midi.MidiFileGenerator(a.score, a.settings, handler).generate()
     download(midi.toBinary(), `${safeName(score.meta.title)}.mid`, 'audio/midi')
   }
-  const exportPdf = () => api()?.print(undefined, { display: { scale: 0.9 } })
+  const exportPdf = () => api()?.print(undefined, { display: { scale: 0.9, resources: LIGHT } })
 
   return (
     <div className="score-view">
