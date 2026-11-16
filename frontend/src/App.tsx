@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Fretboard } from './components/Fretboard'
+import { KeyModal } from './components/KeyModal'
 import { Piano } from './components/Piano'
 import { ScoreView } from './components/ScoreView'
 import { SettingsPanel, type TrackSettings } from './components/SettingsPanel'
@@ -43,6 +44,7 @@ export default function App() {
   const [suggestion, setSuggestion] = useState<CapoSuggestion | null>(null)
   const [leftHanded, setLeftHanded] = useState(readPref('tabiffy.leftHanded'))
   const [seek, setSeek] = useState<{ tick: number; n: number } | null>(null)
+  const [keyOpen, setKeyOpen] = useState(false) // the key/scale window
 
   useEffect(() => {
     getTunings().then(setTunings).catch(() => {})
@@ -187,7 +189,12 @@ export default function App() {
         {shown && (
           <div className="meta">
             <strong>{shown.meta.title || 'Untitled'}</strong>
-            {shown.meta.key && <span className="pill">{shown.meta.key}</span>}
+            {shown.meta.key && (shown.keyAnalysis ? (
+              <button className="pill key" onClick={() => setKeyOpen(true)} title="Why this key? Which scale?">
+                {/* Plain major/minor shows as the key; any other scale shows its full name. */}
+                {['major', 'natural minor'].includes(shown.keyAnalysis.scale.name) ? shown.meta.key : shown.keyAnalysis.scale.label} ⓘ
+              </button>
+            ) : <span className="pill">{shown.meta.key}</span>)}
             <span className="pill">{Math.round(shown.meta.bpm)} BPM</span>
             <span className="pill">{shown.meta.timeSignature.join('/')}</span>
           </div>
@@ -197,6 +204,14 @@ export default function App() {
       </header>
 
       {error && <div className="error banner">{error}</div>}
+      {keyOpen && shown?.keyAnalysis && (
+        <KeyModal
+          analysis={shown.keyAnalysis}
+          tuning={track && track.targetInstrument !== 'piano' ? track.tuning : []}
+          capo={track?.capo ?? 0}
+          onClose={() => setKeyOpen(false)}
+        />
+      )}
 
       {!scoreId && !job && <Upload onFile={onFile} busy={busy} tunings={tunings} />}
       {job && (

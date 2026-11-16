@@ -169,3 +169,32 @@ main { min-width: 0; }
 .suggestions li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .suggestions small { font-size: 11px; }
 .suggestions li > button, .suggestions li > .pill { white-space: nowrap; flex-shrink: 0; }
+
+/* Key & scale window: opened by clicking the key in the top bar. */
+.pill.key { cursor: pointer; color: var(--text); background: var(--surface); font-size: 12px; padding: 2px 10px; border-radius: 99px; }
+.key-modal { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); padding: 20px; }
+.key-modal::backdrop { background: rgb(0 0 0 / 0.45); }
+.key-modal header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.key-modal h2 { margin: 0; font-size: 22px; }
+.key-modal h3 { font-size: 14px; margin: 18px 0 8px; color: var(--muted); font-weight: 600; }
+.key-modal p { margin: 4px 0 0; }
+.key-modal .reasons { margin: 0; padding-left: 18px; line-height: 1.5; }
+.key-modal .alternatives { margin: 0; padding-left: 18px; line-height: 1.6; }
+.scale-notes { display: flex; flex-wrap: wrap; gap: 6px; }
+.scale-notes .pill { font-size: 14px; color: var(--text); }
+.scale-notes .pill.tonic { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.histogram { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; height: 110px; align-items: end; }
+.histogram .bar { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; text-align: center; font-size: 11px; color: var(--muted); }
+.histogram .bar > div { background: var(--border); border-radius: 3px 3px 0 0; min-height: 1px; }
+.histogram .bar.in > div { background: var(--accent); }
+.histogram .bar.in span { color: var(--text); font-weight: 600; }
+.scale-map-wrap { overflow-x: auto; }
+.scale-map { width: 100%; min-width: 560px; height: auto; display: block; }
+.scale-map .str { stroke: var(--muted); stroke-width: 1; }
+.scale-map .fret { stroke: var(--border); stroke-width: 1; }
+.scale-map .nut { stroke: var(--text); stroke-width: 3; }
+.scale-map .fretnum { font-size: 9px; fill: var(--muted); text-anchor: middle; }
+.scale-map .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 1.5; }
+.scale-map .dot.tonic { fill: var(--accent); }
+.scale-map .dotname { font-size: 8px; text-anchor: middle; fill: var(--text); font-weight: 600; }
+.scale-map .dot.tonic + .dotname { fill: var(--accent-text); }

@@ -129,6 +129,31 @@ class AudioInfo(_Model):
     warnings: list[str] = Field(default_factory=list)
 
 
+class ScaleMatch(_Model):
+    """One candidate key/scale, e.g. "F# Phrygian Dominant", with its spelled notes."""
+
+    tonic: str
+    tonic_pc: int
+    name: str
+    label: str
+    family: str
+    notes: list[str]
+    pcs: list[int] = Field(default_factory=list)  # pitch class of each note above (C=0 ... B=11)
+    fit: float  # share of played notes inside the scale (0-1)
+    relative: float = 0.0  # how far behind the best match (0 = best)
+
+
+class KeyAnalysis(_Model):
+    """Why we think the song is in its key; shown when the key is clicked."""
+
+    key: str
+    scale: ScaleMatch
+    alternatives: list[ScaleMatch] = Field(default_factory=list)
+    confidence: Literal["high", "medium", "low"] = "medium"
+    histogram: list[float] = Field(default_factory=list)  # share of playing time per note, C..B
+    reasons: list[str] = Field(default_factory=list)
+
+
 class TabiffyScore(_Model):
     version: int = 1
     meta: Meta = Field(default_factory=Meta)
@@ -138,6 +163,7 @@ class TabiffyScore(_Model):
     tracks: list[Track] = Field(default_factory=list)
     settings: SolverSettings = Field(default_factory=SolverSettings)
     audio: AudioInfo | None = None
+    key_analysis: KeyAnalysis | None = None
 
     def to_json(self) -> str:
         return self.model_dump_json(by_alias=True, exclude_none=True, indent=2)

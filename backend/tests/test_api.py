@@ -33,6 +33,9 @@ def test_midi_upload_to_score(client, fixtures_dir):
     assert t["targetInstrument"] == "guitar" and t["tuning"][0] == "E2"
     assert all("string" in n and "fret" in n and "finger" in n for n in t["notes"])
     assert [c["symbol"] for c in score["chords"]][:4] == ["C", "G", "Am", "F"]
+    ka = score["keyAnalysis"]
+    assert ka["key"] == score["meta"]["key"] and ka["scale"]["notes"] and ka["reasons"]
+    assert len(ka["scale"]["pcs"]) == len(ka["scale"]["notes"]) and len(ka["histogram"]) == 12
 
 
 def test_resolve_with_new_tuning_and_capo(client, fixtures_dir):
@@ -67,6 +70,14 @@ def test_resolve_to_piano_and_transpose(client, fixtures_dir):
     assert t["targetInstrument"] == "piano"
     assert all(n["hand"] in ("L", "R") and "string" not in n for n in t["notes"])
     assert min(n["midi"] for n in t["notes"]) >= min(before)
+
+
+def test_key_follows_transpose(client, fixtures_dir):
+    sid = upload(client, fixtures_dir / "chord_progression.mid")
+    score = client.get(f"/api/scores/{sid}").json()
+    r = client.post(f"/api/scores/{sid}/resolve", json={"trackId": score["tracks"][0]["id"], "transpose": 2})
+    before, after = score["keyAnalysis"]["scale"], r.json()["keyAnalysis"]["scale"]
+    assert after["tonicPc"] == (before["tonicPc"] + 2) % 12 and after["name"] == before["name"]
 
 
 def test_capo_suggestion(client, fixtures_dir):

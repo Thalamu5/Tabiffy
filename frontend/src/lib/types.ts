@@ -53,6 +53,32 @@ export interface TuningSuggestion {
   reason: string
 }
 
+/** One candidate key/scale, e.g. "F# Phrygian Dominant". */
+export interface ScaleMatch {
+  tonic: string
+  tonicPc: number
+  name: string
+  label: string
+  family: string
+  notes: string[]
+  /** pitch class (C=0 ... B=11) of each entry in `notes` */
+  pcs: number[]
+  /** share of played notes inside the scale, 0-1 */
+  fit: number
+  relative: number
+}
+
+/** Key and scale with the reasons behind them (shown when the key is clicked). */
+export interface KeyAnalysis {
+  key: string
+  scale: ScaleMatch
+  alternatives: ScaleMatch[]
+  confidence: 'high' | 'medium' | 'low'
+  /** share of playing time per note, C..B */
+  histogram: number[]
+  reasons: string[]
+}
+
 export interface CapoSuggestion {
   capo: number
   shapesKey: string
@@ -105,6 +131,7 @@ export interface TabiffyScore {
   tracks: Track[]
   settings: SolverSettings
   audio?: AudioInfo
+  keyAnalysis?: KeyAnalysis
 }
 
 export interface Job {

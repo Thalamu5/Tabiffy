@@ -19,6 +19,7 @@ from .midi_import import read_midi
 from .models import CapoSuggestion, ChordLabel, Note, SolverSettings, TabiffyScore, Track
 from .pitch import parse_pc, pc_name, transpose_chord_symbol
 from .quantize import quantize_notes
+from .scale_detect import analyze_key
 from .solver import load_config, solve_track
 from .timing import TempoMap
 from .tunings import default_tuning, is_standard_guitar, tuning_midi
@@ -149,7 +150,12 @@ def relabel_chords(score: TabiffyScore, source: TabiffyScore | None = None) -> N
             notes += prepare_notes(source, source.tracks[idx], opts)
     num, den = score.meta.time_signature
     tpq = score.ticks_per_quarter
-    score.chords = label_chords(notes, tpq, num, round(tpq * 4 / den))
+    beat = round(tpq * 4 / den)
+    score.chords = label_chords(notes, tpq, num, beat)
+    # Key and scale come from the same notes as the chords, so they follow transpose and edits.
+    score.key_analysis = analyze_key(notes, score.chords, beat)
+    if score.key_analysis:
+        score.meta.key = score.key_analysis.key
 
 
 def suggest_capo(score: TabiffyScore, source: Track, opts: ResolveOptions, max_capo: int = 7) -> CapoSuggestion:
