@@ -72,3 +72,37 @@ def write(path: Path, audio: np.ndarray) -> Path:
     peak = np.max(np.abs(audio)) or 1.0
     sf.write(str(path), (audio / peak * 0.8).astype(np.float32), SR)
     return path
+
+
+def legato_line(segments: list[tuple[int, float, str]]) -> np.ndarray:
+    """A single string played with techniques. segments: (midi, seconds, how) with how = "pick",
+    "hammer", "pull" or "slide". Phase stays continuous, so only "pick" makes a new attack."""
+    pieces_f, pieces_env = [], []
+    level = 0.0
+    prev = None
+    for midi, seconds, how in segments:
+        n = int(seconds * SR)
+        f = np.full(n, midi_hz(midi))
+        if how == "slide" and prev is not None:
+            k = min(n, int(0.08 * SR))  # an 80 ms glide from the previous pitch
+            f[:k] = midi_hz(prev) * (midi_hz(midi) / midi_hz(prev)) ** np.linspace(0, 1, k)
+        start = 1.0 if how == "pick" or prev is None else max(level, 0.5) * (1.05 if how != "slide" else 1.0)
+        env = start * np.exp(-np.arange(n) / SR * 2.5)
+        level = float(env[-1])
+        pieces_f.append(f)
+        pieces_env.append(env)
+        prev = midi
+    freq = np.concatenate(pieces_f)
+    env = np.concatenate(pieces_env)
+    phase = 2 * np.pi * np.cumsum(freq) / SR
+    tone = sum(np.sin(h * phase) / h for h in range(1, 6))
+    # A pick attack: a short burst of noise at each picked note.
+    noise = np.zeros_like(tone)
+    rng = np.random.default_rng(1)
+    t = 0
+    for (_, _seconds, how), _f in zip(segments, pieces_f, strict=True):
+        if how == "pick":
+            k = int(0.012 * SR)
+            noise[t : t + k] += rng.uniform(-1, 1, k) * np.linspace(1, 0, k)
+        t += len(_f)
+    return 0.25 * (tone * env + 0.6 * noise)

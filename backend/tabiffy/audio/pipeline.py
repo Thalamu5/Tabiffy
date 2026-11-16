@@ -17,6 +17,7 @@ from ..pipeline import solve_all
 from .beats import BeatInfo, detect_beats
 from .decode import decode
 from .grid import BeatGrid
+from .legato import find_links
 from .transcribe import SILENCE_RMS, RawNote, confidence, remove_drums, stem_rms, transcribe
 
 log = logging.getLogger(__name__)
@@ -82,8 +83,8 @@ def build_source(
     counter = 0
     for name, raw in notes_by_stem.items():
         out: list[Note] = []
-        for d in raw:
-            n = RawNote(**d)
+        raws = [RawNote(**d) for d in raw]
+        for n in raws:
             tick = max(0, grid.tick(n.start))
             dur = max(TPQ // 16, grid.tick(n.end) - tick)
             counter += 1
@@ -98,6 +99,8 @@ def build_source(
                 )
             )
         instrument = name if name in ("guitar", "bass", "piano", "vocals") else "other"
+        if instrument in LEGATO_INSTRUMENTS:
+            mark_legato(raws, out)
         tracks.append(
             Track(
                 id=f"src{len(tracks) + 1}",
@@ -125,6 +128,19 @@ def build_source(
         tracks=tracks,
         audio=audio,
     )
+
+
+LEGATO_INSTRUMENTS = {"guitar", "bass"}  # slides / hammer-ons / pull-offs only make sense on strings
+
+
+def mark_legato(raws: list[RawNote], notes: list[Note]) -> None:
+    """Copy slide / hammer-on / pull-off links found in the audio onto the notes (same order as `raws`)."""
+    for link in find_links(raws):
+        first = notes[link.first]
+        first.techniques = [link.technique]
+        first.legato_to = notes[link.second].id
+        if not link.sure:
+            first.flags = [*first.flags, "suggestedTechnique"]
 
 
 def import_audio(

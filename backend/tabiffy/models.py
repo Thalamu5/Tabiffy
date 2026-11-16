@@ -60,7 +60,9 @@ class Note(_Model):
     # piano
     hand: Literal["L", "R"] | None = None
     finger: int | Literal["T"] | None = None
+    # "slide", "hammer", "pull" (leading into `legato_to`) or "tap". A "suggestedTechnique" flag marks weak evidence.
     techniques: list[str] = Field(default_factory=list)
+    legato_to: str | None = None  # id of the note a slide / hammer-on / pull-off leads into
     confidence: float = 1.0
     user_edited: bool = False
     # Solver/mapping notes for the UI, e.g. "outOfRange", "stretch", "barre".

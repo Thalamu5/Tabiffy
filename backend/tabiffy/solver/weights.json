@@ -21,5 +21,6 @@
   "maxFingersSpanFrets": 5,
   "openStringBonusSingleNote": 0.2,
   "openFarFromNut": 0.12,
-  "melodicCrossing": 0.8
+  "melodicCrossing": 0.8,
+  "legatoStringChange": 3.0
 }

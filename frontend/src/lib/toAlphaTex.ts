@@ -100,6 +100,14 @@ function fingerTex(n: Note): string | null {
   return null
 }
 
+/** alphaTex for a note's technique: "h" = hammer-on / pull-off and "sl" = legato slide into the next note. */
+function techniqueTex(n: Note): string | null {
+  if (!n.legatoTo) return null
+  if (n.techniques.includes('slide')) return 'sl'
+  if (n.techniques.includes('hammer') || n.techniques.includes('pull')) return 'h'
+  return null
+}
+
 interface StaffOptions {
   stringed: boolean
   barTicks: number
@@ -160,9 +168,11 @@ export function staffBars(notes: Note[], opt: StaffOptions): string[] {
         const parts = sounding.map((n) => {
           const isNew = pi === 0 && n.tick === a
           if (opt.stringed) {
-            if (!isNew) return `-.${n.string}`
-            const f = fingerTex(n)
-            return `${n.fret}.${n.string}${f ? `{${f}}` : ''}`
+            // A technique goes on the last piece of a tied note, where it leads into the next note.
+            const last = pi === pieces.length - 1 && n.tick + n.durationTicks <= b
+            const fx = [isNew ? fingerTex(n) : null, last ? techniqueTex(n) : null].filter(Boolean)
+            const props = fx.length ? `{${fx.join(' ')}}` : ''
+            return isNew ? `${n.fret}.${n.string}${props}` : `-.${n.string}${props}`
           }
           return isNew ? midiToName(n.midi) : `${midiToName(n.midi)}{-}`
         })

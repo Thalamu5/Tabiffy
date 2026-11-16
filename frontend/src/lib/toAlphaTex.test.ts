@@ -93,6 +93,24 @@ describe('toAlphaTex', () => {
     expect(staff.bars[0].voices[0].beats[0].chord?.name).toBe('D')
   })
 
+  it('writes hammer-ons, pull-offs and slides on the note they start from', () => {
+    const notes = [
+      note({ tick: 0, durationTicks: 480, midi: 62, string: 2, fret: 3, techniques: ['hammer'], legatoTo: 'b' }),
+      { ...note({ tick: 480, durationTicks: 480, midi: 64, string: 2, fret: 5, techniques: ['pull'], legatoTo: 'c' }), id: 'b' },
+      { ...note({ tick: 960, durationTicks: 1440, midi: 62, string: 2, fret: 3, techniques: ['slide'], legatoTo: 'd' }), id: 'c' },
+      { ...note({ tick: 2400, durationTicks: 480, midi: 67, string: 2, fret: 8 }), id: 'd' },
+    ]
+    const s = load(toAlphaTex(score(notes)))
+    const played = s.tracks[0].staves[0].bars[0].voices[0].beats.flatMap((b) => b.notes)
+    const origin = (fret: number) => played.filter((n) => n.fret === fret && !n.isTieDestination)
+    expect(origin(3)[0].isHammerPullOrigin).toBe(true)
+    expect(origin(5)[0].isHammerPullOrigin).toBe(true)
+    // The slide note lasts over a beat boundary, so it's tied; the slide starts from its last piece.
+    const slidePieces = played.filter((n) => n.fret === 3).slice(1)
+    expect(slidePieces[slidePieces.length - 1].slideOutType).toBe(alphaTab.model.SlideOutType.Legato)
+    expect(origin(8)[0].isHammerPullOrigin).toBe(false)
+  })
+
   it('writes 16th-note triplets (six per beat) as triplet groups', () => {
     // Bar 1: one beat of 16th triplets (tapping-style 16-1-4 on one string), then a half-dotted rest.
     const frets = [16, 1, 4, 16, 1, 4]

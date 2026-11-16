@@ -16,7 +16,9 @@ export interface Note {
   hand?: 'L' | 'R'
   /** 0 = open, 1-4 = index..pinky, 'T' = thumb (piano: 1-5) */
   finger?: Finger
+  /** "slide", "hammer", "pull" (leading into `legatoTo`) or "tap" */
   techniques: string[]
+  legatoTo?: string
   confidence: number
   userEdited: boolean
   flags: string[]

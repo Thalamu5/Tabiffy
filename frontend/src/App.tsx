@@ -8,7 +8,7 @@ import { TimingPanel } from './components/TimingPanel'
 import { Upload } from './components/Upload'
 import { getScore, getTunings, isAudioFile, resolveTrack, setTiming, suggestCapo, suggestTuning, uploadFile, watchJob, type ResolveRequest, type TimingRequest } from './lib/api'
 import { tuningName } from './lib/tunings'
-import { isUncertain } from './lib/alphaTabScore'
+import { isSuggestedTechnique, isUncertain } from './lib/alphaTabScore'
 import type { AudioMode, CapoSuggestion, Job, TabiffyScore, TuningPreset } from './lib/types'
 
 const LOOKAHEAD_TICKS = 480
@@ -173,6 +173,7 @@ export default function App() {
   }, [track, tick])
 
   const uncertain = useMemo(() => (track ? track.notes.filter(isUncertain) : []), [track])
+  const suggestedTechniques = useMemo(() => (track ? track.notes.filter(isSuggestedTechnique).length : 0), [track])
   const reviewNext = () => {
     if (!uncertain.length) return
     const next = uncertain.find((n) => n.tick > tick) ?? uncertain[0]
@@ -248,6 +249,12 @@ export default function App() {
                   {shown.audio ? ' may be wrong (the transcription was unsure) or' : ''} couldn’t be placed comfortably. They’re shown in red.
                 </span>
                 <button onClick={reviewNext}>Review next uncertain note ▶</button>
+              </div>
+            )}
+            {suggestedTechniques > 0 && (
+              <div className="notice">
+                <strong className="suggest-text">{suggestedTechniques}</strong> slide{suggestedTechniques > 1 ? 's' : ''} / hammer-ons /
+                pull-offs are only suggested from the sound. They’re shown in blue: listen and keep the ones that feel right.
               </div>
             )}
             <ScoreView score={shown} scoreId={scoreId!} trackIndex={trackIndex} onTick={onTick} seek={seek} />

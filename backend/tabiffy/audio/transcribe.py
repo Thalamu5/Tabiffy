@@ -15,6 +15,9 @@ class RawNote:
     end: float
     pitch: int
     amplitude: float  # Basic Pitch's note activation (0-1), used as confidence
+    # Clues for slides / hammer-ons / pull-offs (audio/legato.py). Defaults keep older stored notes valid.
+    attack: float = 1.0  # pick-attack strength vs. this recording's typical picked note; low = legato
+    glide_in: float = 0.0  # semitones the pitch glided from before the note began (negative = from below)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -93,7 +96,7 @@ def transcribe(wav_path: Path, instrument: str) -> list[RawNote]:
     from basic_pitch.inference import predict
 
     lo, hi, onset, frame, min_ms = PROFILES.get(instrument, PROFILES["other"])
-    _, _, events = predict(
+    output, _, events = predict(
         str(wav_path),
         _load_model(),
         onset_threshold=onset,
@@ -104,9 +107,70 @@ def transcribe(wav_path: Path, instrument: str) -> list[RawNote]:
         melodia_trick=True,
     )
     notes = [RawNote(float(s), float(e), int(p), float(a)) for s, e, p, a, *_ in events if e > s]
+    add_legato_clues(notes, wav_path, output)
     if instrument in MONOPHONIC:
         notes = keep_one_line(notes, "top" if instrument == "vocals" else "bottom")
     return sorted(notes, key=lambda n: (n.start, n.pitch))
+
+
+ATTACK_MIN_HZ = 3000  # a pick (or pluck) makes broadband noise up here; hammer-ons and slides barely do
+GLIDE_LOOKBACK = 0.15  # seconds before a note's start searched for a slide arriving at it
+
+
+def add_legato_clues(notes: list[RawNote], wav_path: Path, output: dict) -> None:
+    """Fill in `attack` and `glide_in` for every note (see RawNote)."""
+    import librosa
+    import numpy as np
+    from basic_pitch.note_creation import model_frames_to_time
+
+    if not notes:
+        return
+    # Attack: the rise in high-frequency energy at each note start, relative to the recording's picked notes.
+    y, sr = librosa.load(str(wav_path), sr=22050, mono=True)
+    hop = 256
+    spec = np.abs(librosa.stft(y, n_fft=1024, hop_length=hop)) ** 2
+    high = spec[librosa.fft_frequencies(sr=sr, n_fft=1024) >= ATTACK_MIN_HZ]
+    flux = librosa.onset.onset_strength(S=librosa.power_to_db(high + 1e-10), sr=sr, hop_length=hop)
+    times = librosa.frames_to_time(np.arange(len(flux)), sr=sr, hop_length=hop)
+    raw = []
+    for n in notes:
+        f = int(np.searchsorted(times, n.start))
+        window = flux[max(0, f - 1) : f + 5]  # the attack peaks a few frames after the reported start
+        raw.append(float(window.max()) if window.size else 0.0)
+    typical = float(np.percentile(raw, 90)) or 1.0
+    for n, r in zip(notes, raw, strict=True):
+        # The first frames have nothing before them to rise from, so notes there count as picked.
+        n.attack = 1.0 if n.start < 0.05 else round(min(1.0, r / typical), 3)
+
+    # Glide: follow Basic Pitch's fine pitch track backwards from each start while it moves smoothly.
+    contour = np.asarray(output["contour"])  # (frames, 3 bins per semitone from MIDI 21)
+    ctimes = model_frames_to_time(contour.shape[0])
+    for n in notes:
+        n.glide_in = _glide_into(contour, ctimes, n)
+
+
+def _glide_into(contour, ctimes, n: RawNote) -> float:
+    """Semitones between where a smooth pitch slide started and this note (0 if it didn't slide in)."""
+    import numpy as np
+
+    f = int(np.searchsorted(ctimes, n.start))
+    lo_bin = max(0, int((n.pitch - 12.5 - 21) * 3))
+    hi_bin = min(contour.shape[1], int((n.pitch + 12.5 - 21) * 3))
+    path: list[float] = []
+    for fr in range(f, max(-1, int(np.searchsorted(ctimes, n.start - GLIDE_LOOKBACK)) - 1), -1):
+        row = contour[fr, lo_bin:hi_bin]
+        if row.size == 0 or row.max() < 0.12:
+            break
+        pitch = 21 + (lo_bin + int(np.argmax(row))) / 3
+        if path and abs(pitch - path[-1]) > 1.0:  # a jump, not a glide
+            break
+        path.append(pitch)
+    if not path:
+        return 0.0
+    # A real slide passes through in-between pitches, not just the start and end notes.
+    origin = path[-1]
+    between = sum(1 for p in path if min(abs(p - origin), abs(p - n.pitch)) > 0.5)
+    return round(origin - n.pitch, 2) if between >= 2 else 0.0
 
 
 def confidence(amplitude: float, duration: float = 1.0) -> float:

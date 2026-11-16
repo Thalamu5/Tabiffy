@@ -142,6 +142,7 @@ main { min-width: 0; }
 .segmented button.on { background: var(--accent); color: var(--accent-text); }
 .notice.review { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-style: solid; }
 .warn-text { color: var(--warn); }
+.suggest-text { color: #1E6FD9; }
 .modes { border: 1px solid var(--border); border-radius: 12px; margin: 20px 0 0; padding: 8px 14px 12px; background: var(--surface); }
 .modes legend { font-size: 14px; font-weight: 600; padding: 0 6px; }
 .mode { flex-direction: row; align-items: center; gap: 8px; margin: 6px 0; cursor: pointer; }

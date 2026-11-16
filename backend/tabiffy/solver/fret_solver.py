@@ -235,17 +235,27 @@ class FretSolver:
         move = np.abs(p_pos[:, None] - c_pos[None, :]).astype(float)
         t = cfg.move * move * speed + cfg.bigJump * (move > cfg.bigJumpFrets) * speed
         t -= cfg.stayBonus * (move == 0)
-        # Strings still ringing from the previous slice
+        # Strings still ringing from the previous slice (a note that slides/hammers into the next one is
+        # meant to be "cut" by it, so it doesn't count).
+        cur_ids = {n.id for n in cur_slice.notes}
         ringing = []
         for v in prev_vs:
             mask = 0
             for (s, _), n in zip(v.positions, prev_slice.notes, strict=True):
-                if n.tick + n.duration_ticks > cur_slice.tick:
+                if n.tick + n.duration_ticks > cur_slice.tick and n.legato_to not in cur_ids:
                     mask |= 1 << s
             ringing.append(mask)
         ring = np.array(ringing)[p_vi]
         cur_mask = np.array([v.string_mask for v in cur_vs])[c_vi]
         t += cfg.cutRingingNote * ((ring[:, None] & cur_mask[None, :]) != 0)
+        # Slides, hammer-ons and pull-offs only work on one string: penalize splitting a linked pair.
+        for i, n in enumerate(prev_slice.notes):
+            j = next((k for k, m in enumerate(cur_slice.notes) if m.id == n.legato_to), None) if n.legato_to else None
+            if j is None:
+                continue
+            p_str = np.array([v.positions[i][0] for v in prev_vs])[p_vi]
+            c_str = np.array([v.positions[j][0] for v in cur_vs])[c_vi]
+            t += cfg.legatoStringChange * (p_str[:, None] != c_str[None, :])
         # Single-note lines: going up in pitch should not move to a lower string (and vice versa)
         if len(prev_slice.notes) == 1 and len(cur_slice.notes) == 1:
             dp = cur_slice.notes[0].midi - prev_slice.notes[0].midi
@@ -353,4 +363,25 @@ def solve_track(
             n.flags = flags
             out.append(n)
     out.sort(key=lambda n: (n.tick, -n.midi))
+    check_legato(out)
     return SolveResult(notes=out, cost=cost, dropped=pre_dropped + dropped)
+
+
+LEGATO = ("slide", "hammer", "pull")
+
+
+def check_legato(notes: list[Note]) -> None:
+    """Keep a slide / hammer-on / pull-off only if both notes ended up on the same string at different
+    frets; hammer vs pull is set from the fret direction. Otherwise the technique is removed."""
+    by_id = {n.id: n for n in notes}
+    for n in notes:
+        if not n.legato_to:
+            continue
+        nxt = by_id.get(n.legato_to)
+        if nxt is None or nxt.string != n.string or nxt.fret == n.fret or nxt.fret is None or n.fret is None:
+            n.techniques = [t for t in n.techniques if t not in LEGATO]
+            n.legato_to = None
+            n.flags = [f for f in n.flags if f != "suggestedTechnique"]
+        elif "slide" not in n.techniques:
+            kind = "hammer" if nxt.fret > n.fret else "pull"
+            n.techniques = [kind] + [t for t in n.techniques if t not in LEGATO]
