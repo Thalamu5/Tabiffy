@@ -20,6 +20,8 @@ class RawNote:
     # Clues for slides / hammer-ons / pull-offs (audio/legato.py). Defaults keep older stored notes valid.
     attack: float = 1.0  # pick-attack strength vs. this recording's typical picked note; low = legato
     glide_in: float = 0.0  # semitones the pitch glided from before the note began (negative = from below)
+    rise: float = 99.0  # dB its own pitch got louder at the start; ~0 = not played, just still ringing
+    level: float = 0.0  # its pitch's loudness right after the start, in dB below the loudest moment
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -101,6 +103,37 @@ def drop_octave_ghosts(notes: list[RawNote]) -> list[RawNote]:
     return [n for i, n in enumerate(notes) if i not in ghosts]
 
 
+RISE_MIN_DB = 6.0  # a note whose pitch got less than this much louder at its start wasn't played then
+QUIET_DB = 22.0  # notes this much quieter than the loudest note within a second of them are echoes/noise
+QUIET_WINDOW = 1.0  # seconds either side
+RESTRIKE_ATTACK = 0.5  # pick/pluck attack strength (0-1) that marks a ringing note as played again
+
+
+def keep_struck_notes(notes: list[RawNote]) -> list[RawNote]:
+    """Keep only notes that were actually played. When a new note starts, Basic Pitch often reports the
+    notes still ringing (pedal, reverb, open strings) as new too; those are merged back into their first
+    start, so a single-note line doesn't turn into stacked chords. Very quiet notes are dropped."""
+    out: list[RawNote] = []
+    ringing: dict[int, RawNote] = {}  # latest kept note per pitch
+    by_start = sorted(notes, key=lambda n: n.start)
+    for n in by_start:
+        prev = ringing.get(n.pitch)
+        # A ringing note played again (repeated bass notes, a re-strummed chord) only gets a little louder,
+        # but it comes with its own attack, one that no other new note at that moment explains.
+        together = [m for m in by_start if abs(m.start - n.start) <= 0.03 and m.pitch != n.pitch]
+        restruck = n.attack >= RESTRIKE_ATTACK and not any(m.rise >= RISE_MIN_DB for m in together)
+        if n.rise < RISE_MIN_DB and not restruck:
+            if prev is not None and prev.end >= n.start - 0.1:
+                prev.end = max(prev.end, n.end)  # the same note, still sounding
+            continue  # not struck here: a ringing note or an overtone, not a new note
+        loudest = max((m.level for m in by_start if abs(m.start - n.start) <= QUIET_WINDOW), default=n.level)
+        if n.level < loudest - QUIET_DB:
+            continue
+        out.append(n)
+        ringing[n.pitch] = n
+    return out
+
+
 def keep_one_line(notes: list[RawNote], prefer: str) -> list[RawNote]:
     """Make a line monophonic: where notes overlap, keep the top (melody) or bottom (bass) one."""
     notes = sorted(notes, key=lambda n: n.start)
@@ -140,6 +173,8 @@ def transcribe(wav_path: Path, instrument: str) -> list[RawNote]:
     )
     notes = drop_octave_ghosts([RawNote(float(s), float(e), int(p), float(a)) for s, e, p, a, *_ in events if e > s])
     add_legato_clues(notes, wav_path, output)
+    if instrument != "mix":  # in a band mix other instruments' overtones hide real attacks, so it can't be used
+        notes = keep_struck_notes(notes)
     if instrument in MONOPHONIC:
         notes = keep_one_line(notes, "top" if instrument == "vocals" else "bottom")
     return sorted(notes, key=lambda n: (n.start, n.pitch))
@@ -173,6 +208,22 @@ def add_legato_clues(notes: list[RawNote], wav_path: Path, output: dict) -> None
     for n, r in zip(notes, raw, strict=True):
         # The first frames have nothing before them to rise from, so notes there count as picked.
         n.attack = 1.0 if n.start < 0.05 else round(min(1.0, r / typical), 3)
+
+    # Rise: how much each note's own pitch got louder at its start (constant-Q spectrum, one bin per semitone).
+    cqt = np.abs(librosa.cqt(y, sr=sr, hop_length=hop, fmin=librosa.midi_to_hz(21), n_bins=88, bins_per_octave=12))
+    cqt_db = librosa.amplitude_to_db(cqt, ref=np.max)
+    frame_s = hop / sr
+    q = 1 / (2 ** (1 / 12) - 1)  # the CQT's quality factor: each bin listens to about q periods of its note
+    for n in notes:
+        k = min(max(n.pitch - 21, 0), 87)
+        f = int(np.searchsorted(times, n.start))
+        # Low notes need a long listening window, which smears their start; look further back and ahead.
+        reach = int(np.ceil(0.5 * q / librosa.midi_to_hz(n.pitch) / frame_s))
+        after = float(cqt_db[k, f : f + max(5, reach)].max()) if f < cqt_db.shape[1] else -80.0
+        n.level = round(after, 1)
+        b0, b1 = f - reach - 6, f - reach - 1
+        if b0 >= 0:  # notes right at the start of the file have nothing before them to compare with
+            n.rise = round(after - float(cqt_db[k, b0:b1].mean()), 1)
 
     # Glide: follow Basic Pitch's fine pitch track backwards from each start while it moves smoothly.
     contour = np.asarray(output["contour"])  # (frames, 3 bins per semitone from MIDI 21)

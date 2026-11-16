@@ -44,8 +44,16 @@ def suggest_tunings(
     results: list[TuningSuggestion] = []
     pitches = sorted(n.midi for n in source.notes)
     noise_allowance = max(MIN_LOW_NOTES - 1, int(NOISE_FRACTION * len(pitches)))
-    lowest_heard = pitches[min(noise_allowance, len(pitches) - 1)]  # robust "lowest note"
     absolute_lowest = pitches[0]
+    # Robust "lowest note", measured in playing time: a low note that rings for a while is real evidence,
+    # a few short stray notes are not (a held note counts once, however long it lasts).
+    total = sum(n.duration_ticks for n in source.notes) or 1
+    lowest_heard, acc = pitches[-1], 0
+    for n in sorted(source.notes, key=lambda n: n.midi):
+        acc += n.duration_ticks
+        if acc > NOISE_FRACTION * total and len([m for m in pitches if m <= n.midi]) >= MIN_LOW_NOTES:
+            lowest_heard = n.midi
+            break
     for key in candidates("guitar", strings):
         preset = TUNINGS[key]
         opts = ResolveOptions(target="guitar", tuning=preset["notes"], settings=settings)
@@ -53,7 +61,8 @@ def suggest_tunings(
         track, cost = build_track(score, source, opts, "tmp")
         low_open = min(tuning_midi(preset["notes"]))
         below = sum(1 for m in source.notes if m.midi < low_open)
-        below_eff = below if below > noise_allowance else 0
+        below_time = sum(m.duration_ticks for m in source.notes if m.midi < low_open) / total
+        below_eff = below if below > noise_allowance or below_time > NOISE_FRACTION else 0
         dropped = n - len(track.notes)
         # strings tuned more than a whole tone below anything heard are dead weight
         unused_low = sum(1 for o in tuning_midi(preset["notes"]) if o < lowest_heard - 2)

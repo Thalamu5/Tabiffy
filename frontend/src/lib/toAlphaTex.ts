@@ -113,6 +113,34 @@ function techniqueTex(n: Note): string | null {
   return null
 }
 
+/**
+ * Guitar tab writes a ringing note once and marks it "let ring", instead of tying it into every later beat
+ * (which makes a single-note line look like stacked chords). Notes still sounding when a later note starts
+ * are cut there and flagged; alphaTab's playback then lets them ring until their string is played again.
+ */
+function ringToNextNote(notes: Note[]): { notes: Note[]; letRing: Set<string> } {
+  const starts = [...new Set(notes.map((n) => n.tick))].sort((a, b) => a - b)
+  const letRing = new Set<string>()
+  const nextStart = (tick: number) => {
+    // binary search: the first start after `tick`
+    let lo = 0
+    let hi = starts.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (starts[mid] > tick) hi = mid
+      else lo = mid + 1
+    }
+    return starts[lo]
+  }
+  const out = notes.map((n) => {
+    const next = nextStart(n.tick)
+    if (next === undefined || n.tick + n.durationTicks <= next) return n
+    letRing.add(n.id)
+    return { ...n, durationTicks: next - n.tick }
+  })
+  return { notes: out, letRing }
+}
+
 interface StaffOptions {
   stringed: boolean
   barTicks: number
@@ -122,7 +150,8 @@ interface StaffOptions {
 }
 
 /** Build the beats of one staff (a list of bar strings). */
-export function staffBars(notes: Note[], opt: StaffOptions): string[] {
+export function staffBars(input: Note[], opt: StaffOptions): string[] {
+  const { notes, letRing } = opt.stringed ? ringToNextNote(input) : { notes: input, letRing: new Set<string>() }
   const end = opt.totalBars * opt.barTicks
   const bounds = new Set<number>()
   for (let b = 0; b <= opt.totalBars; b++) bounds.add(b * opt.barTicks)
@@ -177,7 +206,8 @@ export function staffBars(notes: Note[], opt: StaffOptions): string[] {
           if (opt.stringed) {
             // A technique goes on the last piece of a tied note, where it leads into the next note.
             const last = pi === pieces.length - 1 && n.tick + n.durationTicks <= b
-            const fx = [isNew ? fingerTex(n) : null, last ? techniqueTex(n) : null].filter(Boolean)
+            const ring = isNew && letRing.has(n.id) ? 'lr' : null
+            const fx = [isNew ? fingerTex(n) : null, ring, last ? techniqueTex(n) : null].filter(Boolean)
             const props = fx.length ? `{${fx.join(' ')}}` : ''
             return isNew ? `${n.fret}.${n.string}${props}` : `-.${n.string}${props}`
           }

@@ -111,6 +111,18 @@ describe('toAlphaTex', () => {
     expect(origin(8)[0].isHammerPullOrigin).toBe(false)
   })
 
+  it('writes a ringing arpeggio as single notes marked let ring, not stacked ties', () => {
+    // A2, E3, A3, B3 in 8ths, each ringing for a whole bar (pedal / reverb).
+    const notes = [[45, 5, 0], [52, 4, 2], [57, 3, 2], [59, 2, 0]].map(([midi, string, fret], i) =>
+      note({ tick: i * 480, durationTicks: 3840, midi, string, fret }))
+    const s = load(toAlphaTex(score(notes)))
+    // Only the last note (nothing after it) keeps its full length, split into tied pieces.
+    const beats = s.tracks[0].staves[0].bars[0].voices[0].beats.filter((b) => b.notes.some((n) => !n.isTieDestination))
+    expect(beats.map((b) => b.notes.length)).toEqual([1, 1, 1, 1])
+    expect(beats.slice(0, 3).every((b) => b.notes[0].isLetRing)).toBe(true)
+    expect(soundingNotes(s).map(([t]) => t)).toEqual([0, 480, 960, 1440])
+  })
+
   it('writes 16th-note triplets (six per beat) as triplet groups', () => {
     // Bar 1: one beat of 16th triplets (tapping-style 16-1-4 on one string), then a half-dotted rest.
     const frets = [16, 1, 4, 16, 1, 4]

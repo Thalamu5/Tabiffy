@@ -14,6 +14,8 @@ the deliberate deviations from the spec.
   high-frequency onsets, glide-in from Basic Pitch's contour); `legato.py` turns them into slide/hammer/pull links
   (`Note.legato_to`). `pipeline.align_beats` shifts the beat grid onto the note onsets. Basic Pitch frequency limits
   must stay inside A0-C8 (`BP_LOWEST_HZ`/`BP_HIGHEST_HZ`): outside it they wrap around and erase every note.
+  `keep_struck_notes` (not in mix mode) keeps only notes whose own pitch got louder at their start (CQT `rise`,
+  windows scaled per pitch); ringing notes re-reported at other notes' onsets are merged, echoes dropped.
 - `frontend/` – React + TypeScript + Vite + alphaTab (`@coderline/alphatab` 1.9). `src/lib/toAlphaTex.ts` converts
   TabiffyScore → alphaTex.
 - `fixtures/` – self-made MIDI files (regenerate with `python scripts/make_fixtures.py`; copies live in
@@ -29,6 +31,8 @@ the deliberate deviations from the spec.
   `check_legato` drops techniques the final tab can't play.
 - Techniques on notes: "slide", "hammer", "pull" (on the first note, leading into `legatoTo`) and "tap"; flag
   "suggestedTechnique" = weak evidence (blue in the UI). alphaTex: `h`, `sl`, beat effect `tt`.
+- alphaTex: on guitar/bass staves a note still ringing when a later note starts is cut there and marked let ring
+  (`lr`), so sustain doesn't show as stacked tied chords (`ringToNextNote` in toAlphaTex.ts).
 - Key/scale analysis (`scale_detect.py`) runs with the chords in `pipeline.relabel_chords` and sets `meta.key`.
 - Rhythm grid: per-beat choice of 16ths / 8th triplets / 16th triplets (Viterbi with switch cost) in `quantize.py`.
 - Tuning presets (with string count, family and a "prior") are in `backend/tabiffy/tunings.py`; tuning suggestion

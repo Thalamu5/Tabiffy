@@ -43,7 +43,11 @@ first with a stem-separation tool of your choice and upload that part.
 
 Automatic transcription is far from perfect. A clean recording of one instrument (or a well-separated
 part) gives the best results; a full band mix gives rough results, since instruments mask each other.
-Slides, hammer-ons and pull-offs are detected from how each note starts (a pick attack or not) and whether
+Only notes that were actually played are kept: when a new note starts, the note detector often reports
+notes that are still ringing (sustain pedal, reverb, open strings) as new ones too; Tabiffy checks whether
+each note's own pitch got louder and merges the rest back into their first start. Ringing notes are written
+once and marked "let ring" rather than tied into every beat. (This check is off for full band mixes, where
+other instruments mask it.) Slides, hammer-ons and pull-offs are detected from how each note starts (a pick attack or not) and whether
 the pitch glides; most are shown as blue suggestions, since distortion and mixing blur these clues. Bends and
 vibrato aren't detected yet. Tapping isn't guessed automatically: tell the app at upload. The red and blue notes
 and the original-audio mode are there to help you judge the tab; the editor (M5) is how mistakes will get fixed.
