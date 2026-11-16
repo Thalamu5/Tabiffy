@@ -1,9 +1,5 @@
-"""Stage 1b: MIDI input shortcut. Reads a .mid file into raw notes per instrument.
-
-The output is a `TabiffyScore` whose tracks hold the *source* notes (no string/fret
-yet). Each (MIDI track, channel) pair with notes becomes one track. Drum channel
-(10) is skipped (drum notation is a non-goal).
-"""
+"""Read a .mid file into source notes (no string/fret yet), one track per (MIDI track, channel).
+The drum channel is skipped, since drum notation isn't a goal."""
 
 from __future__ import annotations
 
@@ -22,6 +18,7 @@ _MAJOR_KEYS = {"C", "G", "D", "A", "E", "B", "F#", "C#", "F", "Bb", "Eb", "Ab", 
 
 
 def instrument_for_program(program: int) -> str:
+    """Guess the instrument family from a General MIDI program number."""
     if 24 <= program <= 31:
         return "guitar"
     if 32 <= program <= 39:
@@ -38,6 +35,7 @@ def _key_name(mido_key: str) -> str:
 
 
 def read_midi(data: bytes, source_file: str = "") -> TabiffyScore:
+    """Parse MIDI bytes into a source score: notes per (track, channel), tempo, meter and title."""
     mid = mido.MidiFile(file=io.BytesIO(data))
     if mid.type == 2:
         raise ValueError("MIDI type 2 (asynchronous tracks) is not supported")

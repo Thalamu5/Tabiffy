@@ -1,10 +1,5 @@
-"""Background jobs.
-
-If TABIFFY_REDIS_URL is set, jobs go to an RQ queue named "tabiffy" and a separate worker
-process runs them (`rq worker tabiffy --url $TABIFFY_REDIS_URL`, see docker-compose.yml).
-Otherwise they run in an in-process thread pool, which is fine for development.
-Both share the data directory, where `job.json` holds status and progress.
-"""
+"""Background jobs: an RQ/Redis queue when TABIFFY_REDIS_URL is set (Docker runs a separate worker),
+otherwise an in-process thread pool for development. Status and progress live in each job's job.json."""
 
 from __future__ import annotations
 
@@ -42,6 +37,7 @@ class UnsupportedFile(ValueError):
 
 
 def file_kind(filename: str) -> str:
+    """ "midi" or "audio" from the file extension; UnsupportedFile for anything else."""
     ext = Path(filename).suffix.lower()
     if ext in MIDI_EXTS:
         return "midi"
@@ -61,6 +57,8 @@ def stage_label(stage: str) -> str:
 
 
 def run_job(job_id: str) -> None:
+    """Process one upload end to end and record progress, the result or a user-friendly error."""
+
     def on_stage(stage: str, progress: float) -> None:
         storage.update_job(
             job_id, status="running", stage=stage, stageLabel=stage_label(stage), progress=round(progress, 3)
@@ -90,13 +88,19 @@ def run_job(job_id: str) -> None:
         storage.update_job(job_id, status="done", stage="done", stageLabel="Done", progress=1.0, scoreId=job_id)
     except UnsupportedFile as e:
         storage.update_job(job_id, status="error", error=str(e))
-    except Exception as e:  # noqa: BLE001 - surface any failure to the user
+    except Exception as e:  # noqa: BLE001 - any failure must end the job, not leave it "running"
+        # Details go to the server log only; the user gets a plain message without internal paths or code.
         log.error("job %s failed: %s", job_id, traceback.format_exc())
-        msg = "Audio support isn't installed on this server" if isinstance(e, ImportError) else str(e)
-        storage.update_job(job_id, status="error", error=msg or e.__class__.__name__)
+        msg = (
+            "Audio support isn't installed on this server"
+            if isinstance(e, ImportError)
+            else "Something went wrong while processing this file. Please try again or try another file."
+        )
+        storage.update_job(job_id, status="error", error=msg)
 
 
 def _queue():
+    """The Redis queue when TABIFFY_REDIS_URL is set, otherwise None (use the thread pool)."""
     url = os.environ.get("TABIFFY_REDIS_URL")
     if not url:
         return None
@@ -107,6 +111,7 @@ def _queue():
 
 
 def submit(job_id: str) -> None:
+    """Start a job in the background (Redis worker or local thread)."""
     q = _queue()
     if q is not None:
         q.enqueue(run_job, job_id, job_timeout=JOB_TIMEOUT_SECONDS, result_ttl=3600, failure_ttl=86400)

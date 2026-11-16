@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { nameToMidi } from '../lib/music'
 import { GUITAR_STRING_COUNTS, findPreset, presetsFor } from '../lib/tunings'
 import type { CapoSuggestion, SolverSettings, TargetInstrument, Track, TuningPreset, TuningSuggestion } from '../lib/types'
 
@@ -27,17 +26,18 @@ const DEFAULT_TUNING: Record<'guitar' | 'bass', string[]> = {
   bass: ['E1', 'A1', 'D2', 'G2'],
 }
 
+/** True when every string is a note name like E2 or F#1 and there are 4-8 of them. */
 function validTuning(text: string): string[] | null {
-  const notes = text.split(/[\s,]+/).filter(Boolean)
+  // Same rule as the server: a letter A-G (any case), optional # or b, and a one-digit octave.
+  const notes = text.split(/[\s,]+/).filter(Boolean).map((n) => n[0].toUpperCase() + n.slice(1))
   if (notes.length < 4 || notes.length > 8) return null
-  try {
-    notes.forEach(nameToMidi)
-    return notes
-  } catch {
-    return null
-  }
+  return notes.every((n) => /^[A-G][#b]?-?[0-9]$/.test(n)) ? notes : null
 }
 
+/**
+ * Track settings: instrument, strings, tuning, capo, transpose and fingering options.
+ * Changes are only applied when "Re-calculate tab" is pressed.
+ */
 export function SettingsPanel({ track, settings, tunings, busy, suggestion, onApply, onSuggestCapo, onSuggestTuning }: Props) {
   // The parent remounts this panel (via `key`) when the track is re-solved, which resets the form.
   const [target, setTarget] = useState<TargetInstrument>(track.targetInstrument)

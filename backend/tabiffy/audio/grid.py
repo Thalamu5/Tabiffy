@@ -14,6 +14,9 @@ from .beats import BeatInfo
 
 
 class BeatGrid:
+    """Maps recording time (seconds) to score ticks so every detected beat is one quarter note.
+    That keeps the tab in line with the band even when the tempo drifts."""
+
     def __init__(
         self,
         beats: BeatInfo,
@@ -58,6 +61,7 @@ class BeatGrid:
         self.bpm = round(60.0 / step, 2)
 
     def tick(self, seconds: float) -> int:
+        """Score tick for a time in the recording (interpolated between beats)."""
         idx = np.arange(len(self.times)) * self.tpq
         if seconds <= self.times[0]:
             slope = self.tpq / (self.times[1] - self.times[0])

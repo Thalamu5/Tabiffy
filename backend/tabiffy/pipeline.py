@@ -31,6 +31,8 @@ SLICE_TOLERANCE_SECONDS = 0.03
 
 @dataclass
 class ResolveOptions:
+    """How to build one track: target instrument, tuning, capo, transpose and locked notes."""
+
     target: str = "guitar"
     tuning: list[str] | None = None
     capo: int = 0
@@ -45,6 +47,8 @@ def _bar_ticks(score: TabiffyScore) -> int:
 
 
 def _chord_lookup(chords: list[ChordLabel]):
+    """Returns f(tick) -> the chord name sounding at that tick (or None)."""
+
     def at(tick: int) -> str | None:
         for c in chords:
             if c.tick <= tick < c.tick + c.duration_ticks:

@@ -6,6 +6,7 @@ const PC: Record<string, number> = {
 }
 const SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
+/** "E2" -> 40. */
 export function nameToMidi(name: string): number {
   const m = /^([A-Ga-g])([#b]?)(-?\d+)$/.exec(name.trim())
   if (!m) throw new Error(`Not a note name: ${name}`)
@@ -13,14 +14,17 @@ export function nameToMidi(name: string): number {
   return pc + (parseInt(m[3], 10) + 1) * 12
 }
 
+/** 40 -> "E2" (sharps). */
 export function midiToName(midi: number): string {
   return `${SHARPS[midi % 12]}${Math.floor(midi / 12) - 1}`
 }
 
+/** The note name without octave, e.g. 61 -> "C#". */
 export function pitchClassName(midi: number): string {
   return SHARPS[midi % 12]
 }
 
+/** True for the black keys of a piano. */
 export function isBlackKey(midi: number): boolean {
   return [1, 3, 6, 8, 10].includes(midi % 12)
 }

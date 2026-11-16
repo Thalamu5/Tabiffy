@@ -10,10 +10,12 @@ export const LOW_CONFIDENCE = 0.5
 const UNCERTAIN_COLOR = '#D32F2F'
 const SUGGESTED_COLOR = '#1E6FD9' // a slide / hammer-on / pull-off we only suspect from the audio
 
+/** A note worth checking: the transcription was unsure, or it couldn't be placed comfortably. */
 export function isUncertain(n: Note): boolean {
   return n.confidence < LOW_CONFIDENCE || n.flags.includes('outOfRange') || n.flags.includes('hardFingering')
 }
 
+/** TabiffyScore -> alphaTab score, with colored notes for review. */
 export function buildAlphaTabScore(score: TabiffyScore, settings: alphaTab.Settings): alphaTab.model.Score {
   const importer = new alphaTab.importer.AlphaTexImporter()
   importer.initFromString(toAlphaTex(score), settings)
@@ -22,6 +24,7 @@ export function buildAlphaTabScore(score: TabiffyScore, settings: alphaTab.Setti
   return at
 }
 
+/** A slide / hammer-on / pull-off that is only suggested from the sound. */
 export function isSuggestedTechnique(n: Note): boolean {
   return n.flags.includes('suggestedTechnique') && !!n.legatoTo
 }

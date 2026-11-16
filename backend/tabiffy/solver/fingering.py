@@ -1,12 +1,6 @@
-"""Finger assignment 1-4 for a chosen voicing and hand position (SPEC 5.2).
-
-`position` is the fret under the index finger. Rules, tried in order:
-1. Default: finger = fret - position + 1 (open strings = 0), raising fingers where two
-   notes would otherwise share one (lower string gets the lower finger).
-2. Same, but packing fingers tightly (1, 2, 3...) when the default runs past 4.
-3. Index-finger barre across the notes on the lowest fretted fret, then 1. or 2. for the rest.
-4. Fallback: clip to 4 and flag the slice as hard.
-"""
+"""Assign fingers 1-4 for a chosen chord shape and hand position (the fret under the index finger).
+Tries in order: one finger per fret, fingers packed tightly, an index-finger barre, then a clipped
+fallback flagged as hard."""
 
 from __future__ import annotations
 

@@ -35,6 +35,7 @@ def candidates(instrument: str = "guitar", strings: set[int] | None = None) -> l
 def suggest_tunings(
     score: TabiffyScore, source: Track, settings=None, strings: set[int] | None = None, top: int = 3
 ) -> list[TuningSuggestion]:
+    """Rank guitar tunings by how well the notes fit, best first, each with a reason."""
     from .pipeline import ResolveOptions, build_track, prepare_notes
 
     settings = settings or score.settings

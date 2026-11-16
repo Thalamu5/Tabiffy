@@ -8,6 +8,8 @@ from .models import TempoPoint
 
 
 class TempoMap:
+    """Converts between score ticks and seconds using the tempo changes."""
+
     def __init__(self, points: list[TempoPoint], tpq: int):
         pts = sorted(points, key=lambda p: p.tick) or [TempoPoint(tick=0, bpm=120)]
         if pts[0].tick != 0:

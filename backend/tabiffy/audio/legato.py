@@ -1,9 +1,6 @@
-"""Find slides, hammer-ons and pull-offs in transcribed audio.
-
-A legato note follows the previous one with no new pick attack. If the pitch glides between them it's
-a slide; if it jumps it's a hammer-on (up) or pull-off (down). Weak evidence gives a *suggested*
-technique, which the tab shows in a different color so the player can judge it.
-"""
+"""Find slides, hammer-ons and pull-offs: a note that follows the previous one with no new pick attack.
+A smooth pitch glide between them makes it a slide; a jump makes it a hammer-on (up) or pull-off (down).
+Weak evidence is only a *suggestion*, shown in blue so the player can judge it."""
 
 from __future__ import annotations
 

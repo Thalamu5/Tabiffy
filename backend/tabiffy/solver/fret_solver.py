@@ -1,17 +1,6 @@
-"""Fret/position solver for guitar & bass (SPEC 5.1).
-
-1. Notes are grouped into time slices (same onset after quantization, or within
-   +-30 ms when quantization is off).
-2. Each slice gets candidate voicings: every note on its own string, frets 0..maxFret.
-   Voicings are scored on their own (span, fingers needed, skipped strings, high
-   frets, open-string bias, chord-shape bonus) and the best K are kept.
-3. Each (voicing, hand position) pair is a Viterbi state. Transition costs model how
-   far the hand moves (scaled up when the gap is short), a bonus for staying put, and a
-   penalty for re-using a string that's still ringing.
-
-The DP is linear in the number of slices, and K bounds the work per slice, so long
-songs stay fast without windowing.
-"""
+"""Choose string and fret for every note (SPEC 5.1). Notes starting together form a slice; each slice
+gets its cheapest playable shapes, and a Viterbi search picks the path where the hand moves least.
+This stays linear in song length, so long songs remain fast."""
 
 from __future__ import annotations
 
@@ -37,6 +26,8 @@ class Slice:
 
 @dataclass
 class Voicing:
+    """One way to play a slice: a (string, fret) for each note, with its own cost."""
+
     positions: list[tuple[int, int]]  # parallel to slice.notes: (string, fret)
     cost: float
     min_fret: int | None
@@ -53,6 +44,7 @@ class SolveResult:
 
 
 def make_slices(notes: list[Note], tolerance_ticks: int = 0) -> list[Slice]:
+    """Group notes that start together (within the tolerance) into slices."""
     slices: list[Slice] = []
     for n in sorted(notes, key=lambda n: (n.tick, n.midi)):
         if slices and n.tick - slices[-1].tick <= tolerance_ticks:
@@ -89,6 +81,8 @@ def note_priority(notes: list[Note], chord_pcs: set[int] | None = None) -> list[
 
 
 class FretSolver:
+    """Finds the easiest string/fret for every note of one track (see module doc)."""
+
     def __init__(
         self,
         open_midi: list[int],
@@ -121,6 +115,7 @@ class FretSolver:
         return opts
 
     def voicing_cost(self, positions: list[tuple[int, int]], notes: list[Note], chord: str | None) -> float:
+        """How hard a shape is on its own: span, fingers, skipped strings, high frets and open strings."""
         cfg = self.cfg
         fretted = [f for _, f in positions if f > 0]
         cost = 0.0
@@ -157,12 +152,14 @@ class FretSolver:
         return cost
 
     def voicings(self, sl: Slice) -> list[Voicing]:
+        """All playable shapes for a slice, cheapest first (plus tapped notes in tapping mode)."""
         notes = sorted(sl.notes, key=lambda n: -n.midi)
         options = [self.note_options(n) for n in notes]
         max_span = self.cfg.maxFingersSpanFrets
         found: list[list[tuple[int, int]]] = []
 
         def rec(i: int, used: int, acc: list[tuple[int, int]], lo: int, hi: int) -> None:
+            """Depth-first search over string choices, skipping shapes the hand can't span."""
             if len(found) > 4000:
                 return
             if i == len(notes):
@@ -244,6 +241,8 @@ class FretSolver:
         prev_slice: Slice,
         cur_slice: Slice,
     ) -> np.ndarray:
+        """Cost of moving from each state of one slice to each state of the next.
+        Covers hand movement, cutting ringing strings, and keeping linked notes on one string."""
         cfg = self.cfg
         p_vi, p_pos, _, p_free = prev
         c_vi, c_pos, _, c_free = cur
@@ -286,6 +285,7 @@ class FretSolver:
         return t
 
     def solve(self, slices: list[Slice]) -> tuple[list[tuple[Voicing, int]], float, list[Note]]:
+        """Viterbi over all slices; notes that can't be played are dropped and returned."""
         dropped: list[Note] = []
         all_vs: list[list[Voicing]] = []
         for sl in slices:

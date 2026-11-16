@@ -1,12 +1,6 @@
-"""Stage 8: snap onsets/durations to a rhythmic grid.
-
-The grid is chosen per quarter note: with triplets enabled, each beat uses the straight
-1/16 grid, the 1/8-triplet grid (3 per beat) or the 1/16-triplet grid (6 per beat).
-A small per-beat penalty for triplet grids and a cost for switching grids between
-neighbouring beats keep loose straight playing straight, while real triplet passages
-(consistent over several beats) keep their triplets. One grid per beat keeps the result
-writable with standard note values.
-"""
+"""Snap note starts and lengths to a rhythm grid, chosen per beat: straight 16ths, 8th triplets or
+16th triplets. Small penalties for triplets and for switching grid keep loose straight playing straight,
+while consistent triplet passages keep their triplets."""
 
 from __future__ import annotations
 
@@ -67,6 +61,7 @@ def beat_grids(onsets: list[int], tpq: int, divisions: list[int]) -> dict[int, i
 
 
 def quantize_notes(notes: list[Note], tpq: int, level: str) -> list[Note]:
+    """Snap note starts and ends to the chosen grid; duplicate notes are merged."""
     if level == "off" or not notes:
         return [n.model_copy() for n in notes]
     divisions = GRIDS[level]

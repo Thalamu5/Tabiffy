@@ -39,6 +39,7 @@ _FLAT_ROOTS = {1, 3, 8, 10}
 
 
 def _labels() -> list[tuple[str, int, tuple[int, ...], float]]:
+    """Every (root, chord quality) combination with its pitch classes."""
     out = []
     for root in range(12):
         for q, (iv, pen) in TEMPLATES.items():
@@ -73,6 +74,8 @@ def _template_scores(profile: np.ndarray, bass_pc: int = -1) -> np.ndarray:
 def label_chords(
     notes: list[Note], tpq: int, beats_per_bar: int = 4, beat_ticks: int | None = None
 ) -> list[ChordLabel]:
+    """Name the chord on each beat, smoothed with Viterbi so names don't flicker.
+    Short passing chords are folded into their neighbours."""
     if not notes:
         return []
     beat = beat_ticks or tpq

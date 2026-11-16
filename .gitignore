@@ -23,3 +23,9 @@ backend/build/
 # Copied in by the alphaTab Vite plugin
 frontend/public/font/
 frontend/public/soundfont/
+
+# Secrets: never commit environment files or keys
+.env
+.env.*
+*.pem
+*.key

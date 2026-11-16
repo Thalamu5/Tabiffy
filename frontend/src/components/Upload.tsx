@@ -26,6 +26,7 @@ const MODES: { value: AudioMode; label: string; hint: string }[] = [
   { value: 'mix', label: 'A full band mix', hint: 'everything together; rough results' },
 ]
 
+/** The start page: drop a file, say what's in it, pick a tuning and whether it uses tapping. */
 export function Upload({ onFile, busy, tunings }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)

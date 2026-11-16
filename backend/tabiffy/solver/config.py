@@ -11,6 +11,8 @@ _WEIGHTS_FILE = Path(__file__).with_name("weights.json")
 
 @dataclass(frozen=True)
 class SolverConfig:
+    """Solver cost weights (higher = more strongly avoided), loaded from weights.json."""
+
     stretch4: float = 2.5
     stretch5: float = 7.0
     fingersImpossible: float = 1000.0  # noqa: N815 (matches the JSON keys)

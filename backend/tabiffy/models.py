@@ -1,22 +1,15 @@
-"""The canonical `TabiffyScore` JSON document (SPEC section 4).
-
-All JSON keys are camelCase; Python attributes are snake_case. Serialize with
-`model_dump(by_alias=True)` / `model_dump_json(by_alias=True)`.
-
-Conventions:
-- `tick` / `durationTicks` use `ticksPerQuarter` (960) resolution.
-- Guitar/bass: `string` 1 = highest-pitched string. `fret` is counted from the
-  capo (fret 0 with capo 2 sounds the open string + 2 semitones), which is how
-  tab is normally written and how alphaTab/Guitar Pro interpret it.
-- `finger`: 0 = open string, 1-4 = index..pinky, "T" = thumb. Piano: 1-5, thumb = 1.
-"""
+"""The TabiffyScore document (SPEC section 4): camelCase in JSON, snake_case in Python.
+Times are ticks at 960 per quarter note. See the field comments for the guitar conventions."""
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
+
+# A note name like "E2", "F#1" or "Bb3". Checked strictly because tunings end up in the score text alphaTab reads.
+NoteName = Annotated[str, Field(pattern=r"^[A-G][#b]?-?[0-9]$")]
 
 Instrument = Literal["guitar", "bass", "piano", "vocals", "other"]
 TargetInstrument = Literal["guitar", "bass", "piano"]
@@ -27,6 +20,8 @@ class _Model(BaseModel):
 
 
 class Meta(_Model):
+    """Song details shown in the header."""
+
     title: str = ""
     artist: str = ""
     source_file: str = ""
@@ -41,6 +36,8 @@ class TempoPoint(_Model):
 
 
 class ChordLabel(_Model):
+    """A chord name and how long it lasts."""
+
     tick: int
     duration_ticks: int
     symbol: str
@@ -49,17 +46,19 @@ class ChordLabel(_Model):
 
 
 class Note(_Model):
+    """One note: pitch and timing, plus string/fret/finger once the solver has placed it."""
+
     id: str
     tick: int
     duration_ticks: int
     midi: int
     velocity: int = 90
     # guitar / bass
-    string: int | None = None
-    fret: int | None = None
+    string: int | None = None  # 1 = highest-pitched string
+    fret: int | None = None  # counted from the capo, as tab is normally written
     # piano
     hand: Literal["L", "R"] | None = None
-    finger: int | Literal["T"] | None = None
+    finger: int | Literal["T"] | None = None  # 0 open, 1-4 index..pinky, "T" thumb (piano: 1-5)
     # "slide", "hammer", "pull" (leading into `legato_to`) or "tap". A "suggestedTechnique" flag marks weak evidence.
     techniques: list[str] = Field(default_factory=list)
     legato_to: str | None = None  # id of the note a slide / hammer-on / pull-off leads into
@@ -76,6 +75,8 @@ class CapoSuggestion(_Model):
 
 
 class TuningSuggestion(_Model):
+    """One suggested tuning with its score and the reason for it."""
+
     key: str  # preset key in tunings.TUNINGS
     label: str
     tuning: list[str]
@@ -87,12 +88,14 @@ class TuningSuggestion(_Model):
 
 
 class Track(_Model):
+    """One instrument part: its notes plus how it is played (tuning, capo, transpose)."""
+
     id: str
     name: str
     source_instrument: Instrument = "other"
     target_instrument: TargetInstrument = "guitar"
-    tuning: list[str] = Field(default_factory=list)  # low -> high
-    capo: int = 0
+    tuning: list[NoteName] = Field(default_factory=list, max_length=8)  # low -> high
+    capo: int = Field(0, ge=0, le=24)
     transpose_semitones: int = 0
     program: int = 25  # General MIDI program used for playback
     notes: list[Note] = Field(default_factory=list)
@@ -158,6 +161,8 @@ class KeyAnalysis(_Model):
 
 
 class TabiffyScore(_Model):
+    """The whole song: meta, tempo, chords, tracks, settings and audio info."""
+
     version: int = 1
     meta: Meta = Field(default_factory=Meta)
     tempo_map: list[TempoPoint] = Field(default_factory=lambda: [TempoPoint(tick=0, bpm=120)])

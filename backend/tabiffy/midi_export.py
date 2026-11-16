@@ -10,6 +10,7 @@ from .models import TabiffyScore
 
 
 def score_to_midi(score: TabiffyScore) -> bytes:
+    """Write the solved score as a standard MIDI file (one track per instrument)."""
     mid = mido.MidiFile(type=1, ticks_per_beat=score.ticks_per_quarter)
     meta = mido.MidiTrack()
     meta.append(mido.MetaMessage("track_name", name=score.meta.title or "Tabiffy", time=0))

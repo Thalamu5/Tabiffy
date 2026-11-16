@@ -13,6 +13,7 @@ import type { CapoSuggestion, Job, TabiffyScore, TuningPreset } from './lib/type
 
 const LOOKAHEAD_TICKS = 480
 
+/** Read a saved on/off preference (browser storage can be unavailable, e.g. private mode). */
 function readPref(key: string): boolean {
   try {
     return localStorage.getItem(key) === '1'
@@ -20,6 +21,7 @@ function readPref(key: string): boolean {
     return false
   }
 }
+/** Save an on/off preference; silently skipped if browser storage is unavailable. */
 function writePref(key: string, v: boolean) {
   try {
     localStorage.setItem(key, v ? '1' : '0')
@@ -28,6 +30,7 @@ function writePref(key: string, v: boolean) {
   }
 }
 
+/** The score id from the page address (?score=...), so a score can be reopened or shared. */
 function scoreIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('score')
 }

@@ -42,12 +42,8 @@ def _noop(_name: str, _progress: float) -> None:
 
 
 def transcribe_audio(input_path: Path, work_dir: Path, mode: str = "guitar", on_stage: Stage = _noop) -> AudioInfo:
-    """Stages 1, 3, 4. The whole file is transcribed as one part (`mode` = what's in it).
-
-    Tabiffy doesn't separate instruments itself: to tab one instrument from a band recording,
-    separate it first with a tool of your choice and upload that part.
-    Writes 3_notes.json and 4_beats.json into work_dir; returns audio info.
-    """
+    """Decode, transcribe and find beats for one recording (`mode` = what's in it).
+    Writes 3_notes.json and 4_beats.json into work_dir so later steps never transcribe twice."""
     work_dir.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
     on_stage("decode", 0.02)
@@ -185,6 +181,8 @@ def import_audio(
     on_stage: Stage = _noop,
     tuning: str = "auto",
 ) -> tuple[TabiffyScore, TabiffyScore]:
+    """Whole audio import: transcribe, build the beat-aligned source, then solve the tab.
+    Returns (source score, solved score)."""
     audio = transcribe_audio(input_path, work_dir, mode, on_stage)
     on_stage("solve", 0.95)
     title = Path(filename).stem.replace("_", " ")

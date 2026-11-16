@@ -5,23 +5,33 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import Field
 
 from . import __version__, jobs, storage
 from .midi_export import score_to_midi
-from .models import CapoSuggestion, SolverSettings, TabiffyScore, TargetInstrument, TuningSuggestion, _Model
+from .models import (
+    CapoSuggestion,
+    NoteName,
+    SolverSettings,
+    TabiffyScore,
+    TargetInstrument,
+    TuningSuggestion,
+    _Model,
+)
 from .pipeline import ResolveOptions, build_track, relabel_chords, solve_all, suggest_capo
 from .tuning_suggest import suggest_tunings
 from .tunings import TUNINGS
 
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+MAX_JSON_BYTES = 20 * 1024 * 1024  # scores and settings; far above a real song's size
 CHUNK = 1024 * 1024
 
 app = FastAPI(title="Tabiffy API", version=__version__)
@@ -33,9 +43,22 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def limit_body_size(request: Request, call_next):
+    """Refuse oversized requests early (uploads have their own, larger limit) so one request can't
+    exhaust the server's memory."""
+    limit = MAX_UPLOAD_BYTES + CHUNK if request.url.path == "/api/jobs" else MAX_JSON_BYTES
+    size = request.headers.get("content-length")
+    if size is not None and (not size.isdigit() or int(size) > limit):
+        return JSONResponse({"detail": "Request is too large"}, status_code=413)
+    return await call_next(request)
+
+
 class ResolveRequest(_Model):
+    """What to change when re-calculating one track's tab."""
+
     track_id: str
-    tuning: list[str] | None = None
+    tuning: list[NoteName] | None = Field(None, max_length=8)
     capo: int = Field(0, ge=0, le=12)
     target: TargetInstrument = "guitar"
     transpose: int = Field(0, ge=-12, le=12)
@@ -51,6 +74,7 @@ def _score_or_404(score_id: str) -> TabiffyScore:
 
 
 def _resolve_inputs(score_id: str, req: ResolveRequest):
+    """Load the score, its stored source notes and the track a request refers to; 404/409 if any are missing."""
     score = _score_or_404(score_id)
     try:
         source = storage.read_stage(score_id, "1b_source")
@@ -185,6 +209,7 @@ def resolve(score_id: str, req: ResolveRequest) -> Response:
 
 @app.post("/api/scores/{score_id}/suggest-capo")
 def capo_suggestion(score_id: str, req: ResolveRequest) -> CapoSuggestion:
+    """Try capo 0-7 on one track and return the easiest to play."""
     score, source, idx, src_track, opts = _resolve_inputs(score_id, req)
     if req.target == "piano":
         raise HTTPException(422, "Capo suggestions are for guitar and bass")
@@ -271,8 +296,10 @@ def tuning_suggestion(score_id: str, req: TuningRequest) -> list[TuningSuggestio
 
 @app.get("/api/scores/{score_id}/export")
 def export(score_id: str, format: str = "mid") -> Response:  # noqa: A002 - matches the SPEC's query param
+    """Download the score as MIDI or Tabiffy JSON (.gp and PDF are made in the browser)."""
     score = _score_or_404(score_id)
-    name = (score.meta.title or "tabiffy").replace('"', "")
+    # Only plain characters in the download name, so a song title can't break the response header.
+    name = re.sub(r"[^A-Za-z0-9 ._-]", "", score.meta.title)[:80].strip() or "tabiffy"
     if format == "mid":
         return Response(
             score_to_midi(score),
@@ -295,6 +322,7 @@ if _dist.is_dir():
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:
+        """Serve the built web app; unknown paths get index.html so in-app links work."""
         if path.startswith("api/"):
             raise HTTPException(404, "Not found")
         f = (_dist / path).resolve()

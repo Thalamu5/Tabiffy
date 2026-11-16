@@ -11,11 +11,13 @@ export function presetsFor(tunings: Record<string, TuningPreset>, instrument: 'g
     .sort(([, a], [, b]) => a.strings - b.strings || FAMILY_ORDER[a.family] - FAMILY_ORDER[b.family])
 }
 
+/** The preset key whose notes match a tuning exactly, if any. */
 export function findPreset(tunings: Record<string, TuningPreset>, notes: string[]): string | undefined {
   const text = notes.join(' ')
   return Object.entries(tunings).find(([, p]) => p.notes.join(' ') === text)?.[0]
 }
 
+/** A short display name for a tuning (preset label, or the notes themselves). */
 export function tuningName(tunings: Record<string, TuningPreset>, notes: string[]): string {
   const key = findPreset(tunings, notes)
   return key ? tunings[key].label.replace(/ \(.*\)$/, '') : notes.join(' ')

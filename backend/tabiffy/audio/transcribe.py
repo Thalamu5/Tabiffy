@@ -11,6 +11,8 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class RawNote:
+    """One note heard in the recording, in seconds, before it is placed on the beat grid."""
+
     start: float  # seconds
     end: float
     pitch: int
@@ -41,6 +43,7 @@ _model = None
 
 
 def _load_model():
+    """Load Basic Pitch's ONNX model once per process (it takes a moment)."""
     global _model
     if _model is None:
         import logging as _logging
@@ -55,6 +58,7 @@ def _load_model():
 
 
 def stem_rms(wav_path: Path) -> float:
+    """Overall loudness of a WAV file, used to skip silent recordings."""
     import numpy as np
     import soundfile as sf
 
@@ -113,6 +117,8 @@ def keep_one_line(notes: list[RawNote], prefer: str) -> list[RawNote]:
 
 
 def transcribe(wav_path: Path, instrument: str) -> list[RawNote]:
+    """Turn a recording into notes with Basic Pitch, using settings tuned for the instrument.
+    Overtone ghosts are removed and each note gets its legato clues."""
     from basic_pitch.inference import predict
 
     lo, hi, onset, frame, min_ms = PROFILES.get(instrument, PROFILES["other"])

@@ -18,6 +18,8 @@ HOP = 512
 
 @dataclass
 class BeatInfo:
+    """Beat times (seconds), tempo and meter found in a recording."""
+
     bpm: float
     beat_times: list[float] = field(default_factory=list)
     beats_per_bar: int = 4
@@ -70,6 +72,7 @@ def downbeat_accents(y: np.ndarray, sr: int, frames: np.ndarray) -> np.ndarray:
 
 
 def detect_beats(wav_path: Path) -> BeatInfo:
+    """Find the beats, tempo, meter and first downbeat of a recording with librosa."""
     import librosa
 
     y, sr = librosa.load(str(wav_path), sr=SR, mono=True)

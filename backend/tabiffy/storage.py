@@ -74,6 +74,7 @@ def delete_job_dir(job_id: str) -> None:
 
 
 def write_job(job_id: str, job: dict) -> None:
+    """Save a job's status atomically (write a temp file, then rename)."""
     p = _job_dir(job_id) / "job.json"
     with _lock:
         tmp = p.with_suffix(".tmp")
@@ -82,6 +83,7 @@ def write_job(job_id: str, job: dict) -> None:
 
 
 def read_job(job_id: str) -> dict:
+    """Load a job's status; KeyError if it doesn't exist."""
     p = _job_dir(job_id) / "job.json"
     if not p.exists():
         raise KeyError(job_id)

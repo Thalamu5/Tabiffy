@@ -13,6 +13,7 @@ interface Props {
   seek?: { tick: number; n: number } | null
 }
 
+/** Save bytes as a file through a temporary link. */
 function download(bytes: Uint8Array, filename: string, type: string) {
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }))
   const a = document.createElement('a')
@@ -22,6 +23,7 @@ function download(bytes: Uint8Array, filename: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+/** A file name made only of safe characters, from the song title. */
 function safeName(s: string) {
   return (s || 'tabiffy').replace(/[^\w\- ]+/g, '').trim() || 'tabiffy'
 }

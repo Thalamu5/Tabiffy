@@ -45,6 +45,7 @@ export function decompose(ticks: number): Piece[] {
   return result ?? fallback(ticks)
 }
 
+/** Exact split into note values (with triplets where needed), or null if impossible. */
 function decomposeExact(ticks: number): Piece[] | null {
   if (ticks === 0) return []
   if (ticks % MIN_TICKS === 0) {
@@ -68,11 +69,13 @@ function decomposeExact(ticks: number): Piece[] | null {
   return null
 }
 
+/** Round to the nearest 64th when no exact split exists. */
 function fallback(ticks: number): Piece[] {
   const rounded = Math.max(MIN_TICKS, Math.round(ticks / MIN_TICKS) * MIN_TICKS)
   return decomposeExact(rounded) ?? []
 }
 
+/** alphaTex duration prefix and effects (dotted, triplet) for one note value. */
 function durationTex(p: Piece): { prefix: string; effects: string[] } {
   const effects: string[] = []
   if (p.dotted) effects.push('d')
@@ -80,10 +83,12 @@ function durationTex(p: Piece): { prefix: string; effects: string[] } {
   return { prefix: `:${p.dur}`, effects }
 }
 
+/** Quote a string for alphaTex so titles and names can't break the score text. */
 function quote(s: string): string {
   return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
+/** Note name with sharps ("Eb2" -> "D#2"), as alphaTex tunings expect. */
 function sharpName(name: string): string {
   // alphaTex wants sharps (e.g. "Eb2" -> "D#2")
   const flats: Record<string, string> = { Db: 'C#', Eb: 'D#', Gb: 'F#', Ab: 'G#', Bb: 'A#', Cb: 'B', Fb: 'E' }

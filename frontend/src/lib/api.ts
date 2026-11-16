@@ -1,5 +1,6 @@
 import type { AudioMode, CapoSuggestion, Job, SolverSettings, TabiffyScore, TargetInstrument, TuningPreset, TuningSuggestion } from './types'
 
+/** Parse a JSON response, turning server errors into readable Error messages. */
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`
@@ -24,6 +25,7 @@ export interface UploadOptions {
   tapping: boolean
 }
 
+/** Upload a song with the user's choices; returns the job id to follow. */
 export async function uploadFile(file: File, opts: UploadOptions): Promise<string> {
   const form = new FormData()
   form.append('file', file)
@@ -73,10 +75,12 @@ export function watchJob(jobId: string, onUpdate: (job: Job) => void): () => voi
   }
 }
 
+/** Load a score by id. */
 export async function getScore(id: string): Promise<TabiffyScore> {
   return json(await fetch(`/api/scores/${id}`))
 }
 
+/** Save the whole score (e.g. after edits). */
 export async function saveScore(id: string, score: TabiffyScore): Promise<void> {
   await json(await fetch(`/api/scores/${id}`, {
     method: 'PUT',
@@ -95,6 +99,7 @@ export interface ResolveRequest {
   settings?: SolverSettings
 }
 
+/** Re-calculate one track's tab with new tuning/capo/settings. */
 export async function resolveTrack(id: string, req: ResolveRequest): Promise<TabiffyScore> {
   return json(await fetch(`/api/scores/${id}/resolve`, {
     method: 'POST',
@@ -103,6 +108,7 @@ export async function resolveTrack(id: string, req: ResolveRequest): Promise<Tab
   }))
 }
 
+/** Ask the server for the easiest capo position. */
 export async function suggestCapo(id: string, req: ResolveRequest): Promise<CapoSuggestion> {
   return json(await fetch(`/api/scores/${id}/suggest-capo`, {
     method: 'POST',
@@ -111,6 +117,7 @@ export async function suggestCapo(id: string, req: ResolveRequest): Promise<Capo
   }))
 }
 
+/** Rank tunings for a track, optionally only for one string count. */
 export async function suggestTuning(id: string, trackId: string, strings?: number[]): Promise<TuningSuggestion[]> {
   return json(await fetch(`/api/scores/${id}/suggest-tuning`, {
     method: 'POST',
@@ -119,6 +126,7 @@ export async function suggestTuning(id: string, trackId: string, strings?: numbe
   }))
 }
 
+/** The tuning presets (with string counts) offered in the menus. */
 export async function getTunings(): Promise<Record<string, TuningPreset>> {
   return json(await fetch('/api/tunings'))
 }
@@ -133,6 +141,7 @@ export interface TimingRequest {
   downbeatShift?: number
 }
 
+/** Fix the timing (tempo, bar lines, meter) and rebuild the score. */
 export async function setTiming(id: string, req: TimingRequest): Promise<TabiffyScore> {
   return json(await fetch(`/api/scores/${id}/timing`, {
     method: 'POST',
@@ -141,12 +150,14 @@ export async function setTiming(id: string, req: TimingRequest): Promise<Tabiffy
   }))
 }
 
+/** The uploaded recording as MP3 bytes, for original-audio playback. */
 export async function getAudio(id: string): Promise<Uint8Array> {
   const res = await fetch(`/api/scores/${id}/audio`)
   if (!res.ok) throw new Error('The original recording is not available')
   return new Uint8Array(await res.arrayBuffer())
 }
 
+/** True for audio file names (anything else is treated as MIDI). */
 export function isAudioFile(name: string): boolean {
   return /\.(mp3|wav|flac|ogg|m4a|aac|opus|aiff?)$/i.test(name)
 }

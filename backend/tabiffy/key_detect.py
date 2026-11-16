@@ -14,6 +14,7 @@ _FLAT_KEYS_MINOR = {2, 7, 0, 5, 10}  # Dm Gm Cm Fm Bbm
 
 
 def detect_key(notes: list[Note]) -> str:
+    """Quick major/minor key guess (Krumhansl-Schmuckler) used before the full scale analysis."""
     hist = np.zeros(12)
     for n in notes:
         hist[n.midi % 12] += n.duration_ticks
