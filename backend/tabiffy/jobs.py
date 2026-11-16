@@ -95,7 +95,9 @@ def run_job(job_id: str) -> None:
         msg = (
             "Audio support isn't installed on this server"
             if isinstance(e, ImportError)
-            else "Something went wrong while processing this file. Please try again or try another file."
+            # Only the error's type is shown: it helps find the cause without revealing paths or data.
+            else "Something went wrong while processing this file. Please try again or try another file. "
+            f"(Error code: {type(e).__name__})"
         )
         storage.update_job(job_id, status="error", error=msg)
 

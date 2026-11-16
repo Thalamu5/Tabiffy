@@ -104,3 +104,22 @@ def test_unwritable_data_folder_gives_a_clear_message(client, monkeypatch, fixtu
     path = fixtures_dir / "pentatonic_riff.mid"
     r = client.post("/api/jobs", files={"file": (path.name, path.read_bytes(), "audio/midi")})
     assert r.status_code == 503 and "data folder" in r.json()["detail"]
+
+
+def test_audio_code_gets_a_writable_cache_folder():
+    # Running as a restricted user (as in Docker), librosa's numba cache must not need write access
+    # to the installed packages or the home folder, or every audio upload fails.
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "NUMBA_CACHE_DIR"}
+    out = subprocess.run(
+        [sys.executable, "-c", "import os, tabiffy.audio; print(os.environ['NUMBA_CACHE_DIR'])"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    ).stdout.strip()
+    parent = os.path.dirname(out)
+    assert out.endswith("tabiffy-numba-cache") and os.access(parent, os.W_OK)
