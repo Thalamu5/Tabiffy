@@ -128,3 +128,38 @@ def test_every_guitar_preset_solves(key):
     track, _ = build_track(score, src, ResolveOptions(tuning=TUNINGS[key]["notes"]), "t")
     assert len(track.tuning) == TUNINGS[key]["strings"]
     assert all(1 <= n.string <= len(track.tuning) for n in track.notes)
+
+
+def test_drop_a_six_string():
+    # Chugging on the open low A with one-finger power chords: a Drop A riff.
+    spec = riff(
+        (0, ["A1", "E2", "A2"]),
+        (2, ["A1"]),
+        (3, ["A1"]),
+        (4, ["C2", "G2", "C3"]),
+        (6, ["A1"]),
+        (8, ["D2", "A2", "D3"]),
+        (10, ["A1"]),
+        (12, ["C2", "G2", "C3"]),
+        (14, ["B1", "F#2", "B2"]),
+    )
+    assert best(spec)[0] in ("drop-a", "7-string-drop-a")
+    assert "drop-a" in best(spec)
+
+
+def test_drop_g_seven_string():
+    # Open low G chugs plus a high lead line only a 7-string reaches comfortably.
+    spec = riff(
+        (0, ["G1", "D2", "G2"]),
+        (2, ["G1"]),
+        (3, ["G1"]),
+        (4, ["A#1", "F2", "A#2"]),
+        (6, ["G1"]),
+        (8, ["D4"]),
+        (9, ["F4"]),
+        (10, ["A4"]),
+        (11, ["D5"]),
+        (12, ["C5"]),
+        (14, ["A4"]),
+    )
+    assert best(spec)[0] == "7-string-drop-g"

@@ -7,7 +7,7 @@
  * Segment lengths are split into standard note values (dotted and triplets included).
  */
 import { midiToName } from './music'
-import type { Note, TabiffyScore, Track } from './types'
+import type { ChordLabel, Note, TabiffyScore, Track } from './types'
 
 const TPQ = 960
 
@@ -177,14 +177,59 @@ export function staffBars(notes: Note[], opt: StaffOptions): string[] {
   return bars.map((beats) => beats.join(' '))
 }
 
-function chordDiagram(track: Track, tick: number): string {
+const DIAGRAM_FRETS = 5 // alphaTab draws 5 frets per chord box
+
+/**
+ * Chord box for one chord: the fret most played on each string while the chord lasts, kept within a
+ * 5-fret window so every dot fits in the box. `firstfret` moves the box up the neck for high shapes.
+ */
+export function chordDiagram(track: Track, chord: ChordLabel): string {
   const n = track.tuning.length
-  const frets: (number | null)[] = Array(n).fill(null)
+  const end = chord.tick + chord.durationTicks
+  // weights[string][fret] = how long that fret sounds during the chord
+  const weights: Map<number, number>[] = Array.from({ length: n }, () => new Map())
   for (const note of track.notes) {
-    if (note.tick === tick && note.string && note.fret !== undefined) frets[note.string - 1] = note.fret
+    if (note.tick < chord.tick || note.tick >= end || !note.string || note.fret === undefined) continue
+    const w = weights[note.string - 1]
+    if (w) w.set(note.fret, (w.get(note.fret) ?? 0) + note.durationTicks)
   }
-  if (frets.every((f) => f === null)) return ''
-  return frets.map((f) => (f === null ? 'x' : String(f))).join(' ')
+
+  // Try each 5-fret window and keep the one covering the most sound (open strings fit any window).
+  const starts = new Set<number>([1])
+  weights.forEach((w) => w.forEach((_, f) => f > 0 && starts.add(f)))
+  let best: { frets: (number | null)[]; total: number; start: number } = { frets: [], total: -1, start: 1 }
+  for (const start of starts) {
+    let total = 0
+    const frets = weights.map((w) => {
+      let pick: number | null = null
+      let pickW = 0
+      w.forEach((wt, f) => {
+        if ((f === 0 || (f >= start && f < start + DIAGRAM_FRETS)) && wt > pickW) {
+          pick = f
+          pickW = wt
+        }
+      })
+      total += pickW
+      return pick
+    })
+    if (total > best.total) best = { frets, total, start }
+  }
+  // A single string isn't a chord shape, so it gets no box.
+  if (best.frets.filter((f) => f !== null).length < 2) return ''
+
+  // Start the box at fret 1 when the shape fits there; otherwise at the lowest fretted note.
+  const fretted = best.frets.filter((f): f is number => f !== null && f > 0)
+  const firstFret = fretted.length && Math.max(...fretted) > DIAGRAM_FRETS ? Math.min(...fretted) : 1
+  // A barre: the lowest fret is held on 2+ strings by the index finger in the solved tab.
+  const low = fretted.length ? Math.min(...fretted) : 0
+  const barreStrings = track.notes.filter(
+    (x) => x.tick >= chord.tick && x.tick < end && x.fret === low && x.finger === 1 && best.frets[(x.string ?? 0) - 1] === low,
+  )
+  const barre = low > 0 && new Set(barreStrings.map((x) => x.string)).size >= 2
+
+  const props = [firstFret > 1 ? `firstfret ${firstFret}` : '', barre ? `barre ${low}` : ''].filter(Boolean)
+  const body = best.frets.map((f) => (f === null ? 'x' : String(f))).join(' ')
+  return props.length ? `${body} {${props.join(' ')}}` : body
 }
 
 /** Convert a whole score. Track order is preserved (alphaTab track i = score.tracks[i]). */
@@ -224,16 +269,16 @@ export function toAlphaTex(score: TabiffyScore): string {
     let chords: Map<number, string> | undefined
     if (ti === chordTrackIndex) {
       chords = new Map()
-      const defined = new Set<string>()
+      // One box per chord name, drawn from its longest occurrence (the most representative shape).
+      const longest = new Map<string, ChordLabel>()
       for (const c of score.chords) {
         chords.set(c.tick, c.symbol)
-        if (!defined.has(c.symbol)) {
-          const diagram = chordDiagram(track, c.tick)
-          if (diagram) {
-            lines.push(`\\chord ${quote(c.symbol)} ${diagram}`)
-            defined.add(c.symbol)
-          }
-        }
+        const prev = longest.get(c.symbol)
+        if (!prev || c.durationTicks > prev.durationTicks) longest.set(c.symbol, c)
+      }
+      for (const [symbol, c] of longest) {
+        const diagram = chordDiagram(track, c)
+        if (diagram) lines.push(`\\chord ${quote(symbol)} ${diagram}`)
       }
     }
     lines.push(`\\staff {score tabs}`)

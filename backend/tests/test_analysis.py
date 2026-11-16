@@ -37,6 +37,15 @@ def test_chord_labels_do_not_flicker():
     assert labels[0].duration_ticks == 2 * BAR
 
 
+def test_one_beat_chords_fold_into_the_previous_chord():
+    # Am for a bar, then one beat of F (a passing harmony), then Am again: reads as a single Am.
+    am, f = [45, 52, 57, 60], [41, 48, 53, 57]
+    spec = [(0, BAR, m) for m in am] + [(BAR, TPQ, m) for m in f] + [(BAR + TPQ, 3 * TPQ, m) for m in am]
+    labels = label_chords(make_notes(spec), TPQ)
+    assert [c.symbol for c in labels] == ["Am"]
+    assert labels[0].duration_ticks == 2 * BAR
+
+
 def test_key_detection():
     c_major = make_notes([(i * 480, 480, m) for i, m in enumerate([60, 62, 64, 65, 67, 69, 71, 72, 67, 64, 60])])
     assert detect_key(c_major) == "C major"

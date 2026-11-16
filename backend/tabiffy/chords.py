@@ -27,7 +27,12 @@ TEMPLATES: dict[str, tuple[tuple[int, ...], float]] = {
     "add9": ((0, 2, 4, 7), 0.08),
 }
 NO_CHORD = "N"
-CHANGE_PENALTY = 0.35
+# Cost of switching chords. Higher keeps passing notes in busy parts from creating a new chord every beat.
+CHANGE_PENALTY = 0.6
+# A slash chord (e.g. D/F#) needs the same bass note under most of the chord, not just one beat.
+SLASH_SHARE = 0.6
+# A chord lasting a single beat right after another chord is usually a passing note, so it is folded in.
+MIN_BEATS = 2
 MIN_WEIGHT = 1e-6
 # flats for these roots read more naturally
 _FLAT_ROOTS = {1, 3, 8, 10}
@@ -127,7 +132,8 @@ def label_chords(
             symbol = pc_name(root, root in _FLAT_ROOTS) + q
             if seg_bass:
                 common_bass = max(set(seg_bass), key=seg_bass.count)
-                if common_bass != root and common_bass in pcs and q != "5":
+                steady = seg_bass.count(common_bass) >= SLASH_SHARE * (e - b + 1)
+                if steady and common_bass != root and common_bass in pcs and q != "5":
                     symbol += "/" + pc_name(common_bass, root in _FLAT_ROOTS)
             conf = float(np.clip(np.mean(emis[b : e + 1, lab]), 0, 1))
             labels.append(
@@ -140,4 +146,18 @@ def label_chords(
                 )
             )
         b = e + 1
-    return labels
+    return _fold_short(labels, beat)
+
+
+def _fold_short(labels: list[ChordLabel], beat: int) -> list[ChordLabel]:
+    """Merge chords shorter than MIN_BEATS into the chord directly before them (when there is no gap)."""
+    out: list[ChordLabel] = []
+    for c in labels:
+        prev = out[-1] if out else None
+        if prev and c.duration_ticks < MIN_BEATS * beat and prev.tick + prev.duration_ticks == c.tick:
+            prev.duration_ticks += c.duration_ticks
+        elif prev and prev.symbol == c.symbol and prev.tick + prev.duration_ticks == c.tick:
+            prev.duration_ticks += c.duration_ticks  # same chord again after a fold: keep it as one
+        else:
+            out.append(c)
+    return out

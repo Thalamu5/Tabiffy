@@ -93,6 +93,25 @@ describe('toAlphaTex', () => {
     expect(staff.bars[0].voices[0].beats[0].chord?.name).toBe('D')
   })
 
+  it('draws high-neck arpeggios as a chord box that starts at the right fret', () => {
+    // F#m arpeggio around the 11th fret: notes arrive one at a time, never at the chord's first tick together.
+    const arp = [
+      note({ tick: 0, durationTicks: 240, midi: 66, string: 4, fret: 11, finger: 1 }),
+      note({ tick: 240, durationTicks: 240, midi: 69, string: 3, fret: 14, finger: 4 }),
+      note({ tick: 480, durationTicks: 240, midi: 73, string: 2, fret: 14, finger: 3 }),
+      note({ tick: 720, durationTicks: 240, midi: 78, string: 1, fret: 14, finger: 4 }),
+      note({ tick: 960, durationTicks: 240, midi: 57, string: 5, fret: 12, finger: 2 }),
+      note({ tick: 1200, durationTicks: 240, midi: 50, string: 6, fret: 4, finger: 1 }), // out of reach: left off the box
+    ]
+    const tex = toAlphaTex(score(arp, { chords: [{ tick: 0, durationTicks: 3840, symbol: 'F#m', pcs: [6, 9, 1], confidence: 1 }] }))
+    const chord = [...load(tex).tracks[0].staves[0].chords.values()][0]
+    expect(chord.name).toBe('F#m')
+    expect(chord.firstFret).toBe(11)
+    // Highest string first; every fretted dot fits inside the 5-fret box.
+    expect(chord.strings).toEqual([14, 14, 14, 11, 12, -1])
+    for (const f of chord.strings) if (f > 0) expect(f - chord.firstFret).toBeLessThan(5)
+  })
+
   it('renders piano tracks on two staves by hand', () => {
     const base = score([])
     base.tracks[0] = {

@@ -23,6 +23,7 @@ TUNINGS: dict[str, dict] = {
     "drop-c-sharp": _t("Drop C#", "guitar", "C#2 G#2 C#3 F#3 A#3 D#4", "drop", 0.15),
     "drop-c": _t("Drop C", "guitar", "C2 G2 C3 F3 A3 D4", "drop", 0.12),
     "drop-b": _t("Drop B", "guitar", "B1 F#2 B2 E3 G#3 C#4", "drop", 0.18),
+    "drop-a": _t("Drop A", "guitar", "A1 E2 A2 D3 F#3 B3", "drop", 0.22),
     "dadgad": _t("DADGAD", "guitar", "D2 A2 D3 G3 A3 D4", "open", 0.3),
     "open-g": _t("Open G", "guitar", "D2 G2 D3 G3 B3 D4", "open", 0.3),
     "open-d": _t("Open D", "guitar", "D2 A2 D3 F#3 A3 D4", "open", 0.3),
@@ -31,6 +32,7 @@ TUNINGS: dict[str, dict] = {
     "7-string-b": _t("7-string B Standard (B E A D G B E)", "guitar", "B1 E2 A2 D3 G3 B3 E4", "standard", 0.15),
     "7-string-a": _t("7-string A Standard", "guitar", "A1 D2 G2 C3 F3 A3 D4", "standard", 0.25),
     "7-string-drop-a": _t("7-string Drop A", "guitar", "A1 E2 A2 D3 G3 B3 E4", "drop", 0.2),
+    "7-string-drop-g": _t("7-string Drop G", "guitar", "G1 D2 G2 C3 F3 A3 D4", "drop", 0.28),
     # 8-string guitar
     "8-string-f-sharp": _t(
         "8-string F# Standard (F# B E A D G B E)", "guitar", "F#1 B1 E2 A2 D3 G3 B3 E4", "standard", 0.25
